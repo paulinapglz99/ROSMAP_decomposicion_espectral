@@ -39,11 +39,7 @@ colnames_no_num[1] <- "gene_id"  #como le quitamos los dos ultimos caracteres ha
 subset_fpkm_matrix <- subset_counts[,(colnames_no_num %in% RNA_seq_metadata$specimenID)] %>% 
                   mutate(gene_id = subset_counts$gene_id, .before = 1) %>%
   rename_all(~str_sub(., end = -3))  # Elimina los dos últimos caracteres de los nombres de columna
- 
 
-
-t_counts$specimenID <- substr(t_counts$specimenID,1,
-                              nchar(t_counts$specimenID)-2)
 
 
 RNA_seq_metadata <- RNA_seq_metadata[(RNA_seq_metadata$specimenID %in% colnames_no_num),c(19,1,17)] %>%  # 19 = specimenID 1 = individualID 17 = cogdx
@@ -71,26 +67,23 @@ cogdx1v <- pull(cogdx1, specimenID)
 cogdx2_3 <- RNA_seq_metadata %>% 
   filter(cogdx == 2 | cogdx == 3)
 
+cogdx2_3v <- pull(cogdx2_3, specimenID)
+
 #libreria para cogdx == c(4, 5) (AD)
 
 cogdx4_5 <- RNA_seq_metadata %>% 
   filter(cogdx == 4 | cogdx == 5)
 
+cogdx4_5v <- pull(cogdx4_5, specimenID)
+
+
 ###########Filtrado final
 
-#transversion 
+FPKM_noMCI <- subset_fpkm_matrix %>%
+  select(gene_, all_of(cogdx1v))
 
-t_counts <- subset_counts[,2:nrow(subset_counts)] %>% 
-  t() %>%  #trans
-  as.data.frame() %>% #lo vuelvo df
-rownames_to_column(var = "specimenID")   #hago que los nombres de filas sean una columna
+FPKM_MCI <- subset_fpkm_matrix %>%
+  select(gene_, all_of(cogdx2_3v))
 
-
-t_counts$specimenID <- substr(t_counts$specimenID,1,
-                              nchar(t_counts$specimenID)-2)
-
-x<- t_counts %>% 
-  filter( specimenID %in% cog)
-
-
-#Tengo dos datasets: RNA_seq_metadata y 
+FPKM_AD <- subset_fpkm_matrix %>%
+  select(gene_, all_of(cogdx4_5v))
