@@ -13,7 +13,7 @@ metadata <- vroom( file = 'cli_bio_metadata.csv') #metadata for all assays
 
 RNA_seq_metadata <- metadata %>% 
   filter(assay == 'rnaSeq', 
-         organ == 'brain')
+         organ == 'brain') 
 
 # gene ID, the copy of the gene ID and two repeated samples with _6 and _7 are deleted (_0 was left)
 
@@ -33,7 +33,7 @@ colnames_woID[1] <- "gene_id"  #as we remove the last two characters we have to 
 
 fpkm_matrix <- counts[,(colnames_woID %in% RNA_seq_metadata$specimenID)] %>% 
   mutate(gene_id = counts$gene_id, .before = 1) %>%
-  rename_all(~str_sub(., end = -3))  # Elimina los dos últimos caracteres de los nombres de columna
+  rename_at(-1, ~str_sub(., end = -3))  # Elimina los dos últimos caracteres de los nombres de columna menos de la gene_id
 
 #
 
@@ -79,14 +79,14 @@ FPKM_noMCI <- fpkm_matrix %>%
 FPKM_MCI <- fpkm_matrix %>%
   select(gene_, all_of(cogdx2_3v))
 
-FPKM_AD <- subset_fpkm_matrix %>%
+FPKM_AD <- fpkm_matrix %>%
   select(gene_, all_of(cogdx4_5v))
 
 
 #Save tables
 
-#vroom_write(FPKM_AD, 
-#          file = 'FPKM_AD,csv', 
-#         delim = ',')
+#vroom_write(FPKM_noMCI, 
+#         file = 'FPKM_noMCI.csv', 
+#        delim = ',')
 
 #next script 1.script_mat_coexpre_rosmap
