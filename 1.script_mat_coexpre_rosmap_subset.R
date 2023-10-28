@@ -10,7 +10,7 @@ pacman::p_load("tidyverse",
 
 ##abrir archivos
 
-dir<-'FPKM_noMCI.csv' #archivo
+dir<-'FPKM_AD.csv' #archivo
 
 FPKM <- vroom(file = dir)
 
@@ -28,17 +28,16 @@ FPKM <- vroom(file = dir)
 
 #hare un subset para q mi compu no muera
 
-subset_FPKM <- FPKM[1:100,]
+subset_FPKM <-  vroom(file = dir)
 
 ##Limpiar columna 'gene_id': quitar los puntos del gene_id (tomo parte del código de sol)
 
-identificadores<- subset_FPKM %>% 
-  pull(gene_id) 
+identificadores<- pull(subset_FPKM,gene_id)
 
-identificadores <- sapply(strsplit(identificadores,".",fixed=T),
-                          function(x) x[1])
+identificadores<-sapply(strsplit(identificadores,".",fixed=T),function(x) x[1])
 
-subset_FPKM<-subset_FPKM %>% add_column(identificadores)
+subset_FPKM <- subset_FPKM %>% add_column(identificadores)
+
 
 #Generar anotacion con ensembl. Annotate gene_biotype, GC content
 
@@ -46,21 +45,21 @@ mart <- useEnsembl("ensembl",
                    dataset="hsapiens_gene_ensembl")
 
 myannot <- getBM(attributes = c("ensembl_gene_id", 
-                             "percentage_gene_gc_content", 
-                             "gene_biotype"),
-              filters = "ensembl_gene_id", 
-              values= identificadores,
-              mart= mart)
+                                "percentage_gene_gc_content", 
+                                "gene_biotype"),
+                 filters = "ensembl_gene_id", 
+                 values= identificadores,
+                 mart= mart)
 
 ##juntar anotaciones de biomart con tabla de datos, para generar la data anotada
 
-expression <-left_join(x = subset_FPKM,
-                         y = myannot,
-                         by = c('identificadores'='ensembl_gene_id'))
+expre <-left_join(x = subset_FPKM,
+                  y = myannot,
+                  by = c('identificadores'='ensembl_gene_id'))
 
 ##Quedarme solo con los datos de tipo 'gene coding' (pues por ahora son los únicos que nos interesan)
 
-protcod <- filter(expression, 
+protcod <- filter(expre, 
                        gene_biotype =='protein_coding')
 
 valores_expre <- protcod %>% 
