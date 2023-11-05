@@ -1,5 +1,15 @@
 #Script que hace mutual information para datos de expresion RNAseq de ROSMAP
 
+pacman::p_load('future', 
+               'tidyverse', 
+               'infotheo',
+               'furrr', 
+               'vroom'
+               )
+#
+
+setwd(dir = '/datos/home/paulinapg/redesROSMAP/')
+
 #set timer ---- 
 
 tempus <- Sys.time()
@@ -26,7 +36,7 @@ plan(multicore, workers = 40)
 
 #info mutua de matriz 
 
-MI_AD <- map(.x = my_index_i, .f = function(k){
+MI_MI <- future_map(.x = my_index_i, .f = function(k){
   
   kk = mat_dis[k]
   
@@ -41,7 +51,7 @@ MI_AD <- map(.x = my_index_i, .f = function(k){
 
 #when done
 
-write_rds(x =MI_AD, file = "/datos/rosmap/ROSMAP_RNAseq_MutualInfo_AD_matrix.rds")
+saveRDS(MI_MI, "ROSMAP_RNAseq_MutualInfo_allAD_matrix.rds")
 
 #faroleando
 
