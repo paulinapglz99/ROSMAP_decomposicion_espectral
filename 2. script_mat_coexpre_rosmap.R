@@ -44,22 +44,24 @@ expre <-left_join(x = FPKM,
 
 ##Keep only the 'gene coding' type data (since for now they are the only ones we are interested in).
 
+##Quedarme solo con los datos de tipo 'gene coding' (pues por ahora son los únicos que nos interesan)
+
 protcod <- filter(expre, 
-                       gene_biotype =='protein_coding')
+                  gene_biotype =='protein_coding')
 
 valores_expre <- protcod %>% 
   dplyr::select(-gene_id,
-                -gene_biotype,
-                -identifiers,
-                -percentage_gene_gc_content)
+                -identificadores)
 
-#### Discretization of data
+my_index <- pull(protcod, 'gene_id')
+
+#vroom_write(protcod, 
+#            file = 'protcod_AD.txt',  #this for MCI and noMCI also
+#           delim = ',')
+
+####  Discretizacion de los datos
+#esto genera una matriz de expresion discretizada
+
 mat_dis<-infotheo::discretize(t(valores_expre))
 
-#Save matrix
-
-#vroom_write(mat_dis, 
-#       file = 'coexpression_matrix_AD.txt', 
-#      delim = ',')
-
-###Next script is 3.mutualinformation_parallel.R
+###Next script is 3.mutualinformation_matrix_parallel.R
