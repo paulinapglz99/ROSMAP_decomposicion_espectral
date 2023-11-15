@@ -41,7 +41,9 @@ FPKM_p1_p8<-left_join(x=FPKM_p1_p6,
 
 FPKM_p1_p8 <- FPKM_p1_p8 %>% 
   dplyr::select(-c("tracking_id.x", "tracking_id.y", #remove inopportune data 
-            "492_120515_6", "492_120515_7"))
+            "492_120515_6", "492_120515_7")) 
+
+#note: I lost 2 samples (492_120515_6 and 492_120515_7)
 
 #save table for later
 
