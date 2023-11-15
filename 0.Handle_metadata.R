@@ -50,3 +50,5 @@ FPKM_p1_p8 <- FPKM_p1_p8 %>%
 #vroom_write(FPKM_p1_p8,
 #           file = "RNAseq_FPKM_1_to_8_merged.csv", 
 #           delim = ",")
+
+#Next script is 1.MatchFPKMandClinicalMetadata.R
