@@ -54,3 +54,5 @@ saveRDS(MI_MI, "ROSMAP_RNAseq_MutualInfo_allMCI_matrix.rds")
 #print time ----
 
 print(Sys.time() - tempus)
+
+#Next script is the 4.rds_to_matrix.R and 5.zero_diag.R
