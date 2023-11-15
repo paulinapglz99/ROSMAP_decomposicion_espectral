@@ -8,31 +8,19 @@ pacman::p_load("tidyverse",
        'vroom', 
        'biomaRt')
 
-#Read data
+#Read normalized data (this input is for AD, MCI and noMCI, but here I use only AD
 
 dir<-'FPKM_AD.csv' #discretized coexpression matrix
 
 FPKM <- vroom(file = dir)
 
-##join tables with different expression data plates IF NEEDED
+#pull identifiers
 
-#FPKM <-dplyr::left_join(x=genes_expre_p1_p6,
-#                              y=genes_expre_p7_p8,
-#                             by=c('gene_id'='gene_id'))
-#
-#FPKM$tracking_id.x=NULL
+identifiers <- pull(FPKM,gene_id)
 
-#vroom_write(FPKM, 
-#           file = 'RNAseq_FPKM_1_to_8_merged.csv', 
-#           delim = ',')
+identifiers <-sapply(strsplit(identifiers,".",fixed=T),function(x) x[1])
 
-##Clean column 'gene_id': remove .XX from gene_id
-
-identificadores<- pull(FPKM,gene_id)
-
-identificadores<-sapply(strsplit(identificadores,".",fixed=T),function(x) x[1])
-
-FPKM <- FPKM %>% add_column(identificadores)
+FPKM <- FPKM %>% add_column(identifiers)
 
 #Generate annotation with ensembl. Annotate gene_biotype, GC content
 
@@ -43,14 +31,14 @@ myannot <- getBM(attributes = c("ensembl_gene_id",
                                 "percentage_gene_gc_content", 
                                 "gene_biotype"),
                  filters = "ensembl_gene_id", 
-                 values= identificadores,
+                 values= identifiers,
                  mart= mart)
 
 ##join biomart annotations with data table, to generate the annotated data
 
 expre <-left_join(x = FPKM,
                   y = myannot,
-                  by = c('identificadores'='ensembl_gene_id'))
+                  by = c('identifiers'='ensembl_gene_id'))
 
 ##Keep only the 'gene coding' type data (since for now they are the only ones we are interested in).
 
@@ -60,7 +48,7 @@ protcod <- filter(expre,
 valores_expre <- protcod %>% 
   dplyr::select(-gene_id,
                 -gene_biotype,
-                -identificadores,
+                -identifiers,
                 -percentage_gene_gc_content)
 
 #### Discretization of data
