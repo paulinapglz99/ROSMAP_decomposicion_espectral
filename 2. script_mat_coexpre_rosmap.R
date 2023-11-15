@@ -10,13 +10,15 @@ pacman::p_load("tidyverse",
 
 #Read normalized data (this input is for AD, MCI and noMCI, but here I use only AD
 
-dir<-'FPKM_AD.csv' #discretized coexpression matrix
+dir <-'FPKM_AD.csv' #counts for every cogdx
 
 FPKM <- vroom(file = dir)
 
-#pull identifiers
+#pull identifiers for annotation
 
 identifiers <- pull(FPKM,gene_id)
+
+#
 
 identifiers <-sapply(strsplit(identifiers,".",fixed=T),function(x) x[1])
 
