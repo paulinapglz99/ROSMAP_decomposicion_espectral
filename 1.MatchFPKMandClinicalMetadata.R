@@ -17,12 +17,6 @@ RNA_seq_metadata <- metadata %>%
   filter(assay == 'rnaSeq', 
          organ == 'brain') 
 
-# gene ID, the copy of the gene ID and two repeated samples with _6 and _7 are deleted (_0 was left)
-
-counts <- counts[,-c(460,544,573)] 
-
-#note: I lost 2 samples (492_120515_6 and 492_120515_7).
-
 #Remove the last two characters from geneID identifiers to match them with 
 #the RNASeq metadata
 
@@ -42,30 +36,36 @@ fpkm_matrix <- counts[,(colnames_woID %in% RNA_seq_metadata$specimenID)] %>%
 RNA_seq_metadata <- RNA_seq_metadata[(RNA_seq_metadata$specimenID %in% colnames_woID),c(19,1,17)] %>%  # 19 = specimenID 1 = individualID 17 = cogdx
   arrange(match(specimenID, colnames_woID[-1]))
 
-#1 NCI: No cognitive impairment (No impaired domains)
-#2 MCI: Mild cognitive impairment (One impaired domain) and NO other cause of CI
-#3 MCI: Mild cognitive impairment (One impaired domain) AND another cause of CI
-#4 AD: Alzheimer’s dementia and NO other cause of CI (NINCDS PROB AD)
-#5 AD: Alzheimer’s dementia AND another cause of CI (NINCDS POSS AD)
-#6 Other dementia: Other primary cause of dementia
+#Subset by cognitive diagnosis ------------------
+
+#First, we assign libraries for the respective cognitive diagnosis
+
+#as the metadata dictionary says:
+
+##1 NCI: No cognitive impairment (No impaired domains)
+##2 MCI: Mild cognitive impairment (One impaired domain) and NO other cause of CI
+##3 MCI: Mild cognitive impairment (One impaired domain) AND another cause of CI
+##4 AD: Alzheimer’s dementia and NO other cause of CI (NINCDS PROB AD)
+##5 AD: Alzheimer’s dementia AND another cause of CI (NINCDS POSS AD)
+#36 Other dementia: Other primary cause of dementia
 
 #we dont need cogdx == 6
 
-#library for cogdx == 1 (NCI)
+#library for no MCI (sanos)
 
 cogdx1 <- RNA_seq_metadata %>% 
   filter(cogdx == 1)
 
 cogdx1v <- pull(cogdx1, specimenID)
 
-# cogdx == c(2, 3) (all MCI)
+# For all MCI (mild cognitive impairment)
 
 cogdx2_3 <- RNA_seq_metadata %>% 
   filter(cogdx == 2 | cogdx == 3)
 
 cogdx2_3v <- pull(cogdx2_3, specimenID)
 
-# cogdx == c(4, 5) (all AD)
+# Library for all types of AD
 
 cogdx4_5 <- RNA_seq_metadata %>% 
   filter(cogdx == 4 | cogdx == 5)
@@ -73,7 +73,7 @@ cogdx4_5 <- RNA_seq_metadata %>%
 cogdx4_5v <- pull(cogdx4_5, specimenID)
 
 
-###########Finally we subset RNAseq FPKMS by cogdx
+# Finally we subset RNAseq FPKMS by cogdx ----------
 
 FPKM_noMCI <- fpkm_matrix %>%
   dplyr::select(gene_id, all_of(cogdx1v))
