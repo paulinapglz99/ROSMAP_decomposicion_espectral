@@ -1,121 +1,149 @@
-#analisis de redes
+#My networks analysis
 
-#paquetes
+#Libraries  ------
 
 pacman::p_load('tidyverse', 
                'igraph', 
                'ggplot2')
 
-#llamar a la matriz de adyacencia
+#Read adjacency matrix ----
 
-matrix <- vroom::vroom(file = '/datos/rosmap/matriz_coexpre_allAD_11052023_zero.txt') %>% 
+matrix <- vroom::vroom(file = '/datos/rosmap/matriz_coexpre_noMCI_11052023_zero.txt') %>% 
    as.data.frame()
 
-#antes de hacer la red ----
+#Pivot  ----
 
 matrix_MI <- matrix %>% 
   pivot_longer(cols = -gene,
                names_to = 'gene_to',
                values_to = 'mi')
 
-########---
+########--- 
 
-#histograma de Mutual Information
-
+#Mutual Information histogram
 
 hist(matrix_MI$mi)
 
-hist_allAD_MI <- ggplot(matrix_MI, aes(x = mi)) +
-  geom_histogram() +
-  labs(title = "Histograma de Informacion Mutua",
-       subtitle = "Para sujetos ROSMAP con cogdx de AD",
-       x = "Informacion Mutua", y = "Frecuencia") +
-  scale_y_continuous(labels = function(x) format(x, scientific = FALSE))
+#Full net histogram
+#No correr este histograma a menos que tengas tiempo
 
-#decision, voy a cortar en 0.5 y en 1 para ver como queda
+hist_MI<- ggplot(matrix_MI, aes(x = mi)) +
+  geom_histogram(fill = "skyblue", color = "white") +
+  labs(title = "Histograma de Informacion Mutua",
+       subtitle = "Para sujetos ROSMAP sin demencia, sin corte de MI",
+       x = "Informacion Mutua", y = "Frecuencia")
+
+
+# Guardamos el plot
+#ggsave( filename = "hist_allAD_MI_nocutt.png",  # el nombre del archivo de salida        plot = hist_allAD_MI,           # guardamos el ultimo grafico que hicimos
+#       width = 10,                # ancho de n pulgadas
+#       height = 8,               # alto n de pulgadas
+#       dpi = 600 )               # resolucion de 600 puntos por pulgada
+
+
+#Mutual information cuts -------
+
+#MI>0.5
 
 matrix_MI_0.5 <- matrix_MI %>% 
  filter(mi >= 0.5)
 
-hist(matrix_MI_0.5$mi)
+hist_MI0_5 <- ggplot(matrix_MI_0.5, aes(x = mi)) +
+  geom_histogram(fill = "skyblue", color = "white") +
+  labs(title = "Histograma de Informacion Mutua",
+       subtitle = "Para sujetos ROSMAP sin demencia, corte MI > 0.5",
+       x = "Informacion Mutua", y = "Frecuencia") +
+  scale_y_continuous(labels = function(x) format(x, scientific = FALSE))
 
 
-matrix_MI_1.0 <- matrix_MI %>% 
-  filter(mi >= 1)
+#MI>0.8
 
-hist(matrix_MI_1.0$mi)
+matrix_MI_0.8 <- matrix_MI %>% 
+  filter(mi >= 0.8)
 
+hist_MI0_8 <- ggplot(matrix_MI_0.8, aes(x = mi)) +
+  geom_histogram(fill = "skyblue", color = "white") +
+  labs(title = "Histograma de Informacion Mutua",
+       subtitle = "Para sujetos ROSMAP con cogdx de AD, corte MI > 0.8",
+       x = "Informacion Mutua", y = "Frecuencia") +
+  scale_y_continuous(labels = function(x) format(x, scientific = FALSE))
 
-#100 000 edges de mayor a menor y me quedo con los primeros 10 000 interacciones
-#quedate con el 5% de los nodos mas altos
+#Build net from pivot data ----
 
-#hacer red a partir de data frame
+graph <- graph_from_data_frame(matrix_MI, 
+                                 directed = F)  #full net
 
-graphAD <- graph_from_data_frame(matrix_MI, 
-                                 directed = F)
+graph0.5 <- graph_from_data_frame(matrix_MI_0.5, 
+                               directed = F)    #cut on 0.5
 
-#graphAD_0.5 <- graph_from_data_frame(matrix_MI_0.5, 
-#                               directed = F)
+graph0.8 <- graph_from_data_frame(matrix_MI_0.8, 
+                                     directed = F) #cut on 0.8
 
-#graphAD_1.0 <- graph_from_data_frame(matrix_MI_1.0, 
-#                                   directed = F)  
+#write graphs in graphml ----
 
+#write_graph(graphAD_0.5, 
+#           file = 'coexpre_noMCI_16112023_graph_MI0.5.graphml', 
+#           'graphml') #'edgelist.txt' / '.graphml'
 
-write_graph(graphAD, 
-           file = 'coexpre_allAD_11052023_graph_nocutt.txt', 
-           'edgelist')
+#Network generalities ---
 
-vroom::vroom(file = "coexpre_allAD_11052023_graph_AD.txt")
+#Summary 
 
-#generalidades de las redes ---
+summary(graph0.5) #resumen
 
-components(graphAD)
+#Number of components 
 
-components(graph_0.5) #saber cuantos componentes tiene
+components(graphAD0.8) #saber cuantos componentes tiene
 
-components(graph_1.0) #saber cuantos componentes tiene
-#we can also see degree by node
-degree(graphAD)
+#Degree by node 
 
-degree(graph_0.5) #devuelve un vector donde para cada nodo tengo el valor de grado, es decir el numero de L
+degree(graph0.5) #devuelve un vector donde para cada nodo tengo el valor de grado, es decir el numero de L
 
-degree(graph_1.0) #devuelve un vector donde para cada nodo tengo el valor de grado, es decir el numero de L
+#edge betweenneess
 
-degree_distribution(graphAD) %>%
-  unique()
-
-#edge betweenneess -----
-
-betweenneessAD <- betweenness(graphAD,
+E(graph0.5)$betweenneessAD <- betweenness(graph0.5,
             directed = F)
 
-#coreness ----
+#Iterative cutt --------
 
-corenessAD <- coreness(graphAD) %>%  
-  as.data.frame()
+# Función para construir la red y obtener el número de componentes
+generate_network_and_components <- function(matrix_MI, cutoff) {
+  matrix_MI_filtrado <- matrix_MI %>%
+    filter(mi >= cutoff)
+  
+  graph <- graph_from_data_frame(matrix_MI_filtrado, directed = FALSE)
+  num_components <- components(graph)$no
+  
+  result <- tibble(cutoff_value = cutoff, num_components = num_components)
+  return(result)
+}
 
-coreness_0.5 <- coreness(graph_0.5) %>%  
-  as.data.frame()
+# Iterar sobre los valores de corte de 0.01 a 0.8 en incrementos de 0.01
 
-coreness_1.0 <- coreness(graph_1.0) %>%  
-  as.data.frame()
+cutoff_values <- seq(0.5, 0.8, by = 0.01)
 
-hist(corenessAD$.)
-hist(coreness_0.5$.)  #histograma de mi coreness distribucion de probabilidad
+# Crear una lista para almacenar los resultados
 
-hist(coreness_1.0$.)  #histograma de mi coreness distribucion de probabilidad
+results_list <- lapply(cutoff_values, function(cutoff) {
+  generate_network_and_components(matrix_MI, cutoff)
+})
 
-#extraigo vectores
+# Table with the cutoff value and number of components of the net
 
-coreness_0.5v <- as.vector(rownames(coreness_0.5))
+cutoff_table <- bind_rows(results_list)
 
-coreness_1.0v <- as.vector(rownames(coreness_1.0))
+#Now I want to use the same for a fineblanking between 0.53 and 0.54
 
-#haciendo un subgrafo solo con los vertices de coreness_3
+fineblanking_cutoff_values <- seq(0.53, 0.54, by = 0.001)
 
-subraph_kcore <- induced_subgraph(graph, vids = coreness_1.0)
+# Crear una lista para almacenar los resultados
 
-#plotear 
+fineblanking_list <- lapply(fineblanking_cutoff_values, function(cutoff) {
+  generate_network_and_components(matrix_MI, cutoff)
+})
 
-print(subraph_kcore3)
-subraph_kcore3.p <- plot(subraph_kcore3) #IFUCKINGDIDIT
+# Table with the cutoff value and number of components of the net
+
+fineblanking_list_table <- bind_rows(fineblanking_list)
+
+#Cut will be at 0.532
