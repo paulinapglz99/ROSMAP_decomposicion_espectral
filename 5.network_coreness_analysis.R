@@ -1,48 +1,40 @@
-#Analisis de k-cores para redes
+#Coreness analysis
 
-#paquetes
+#Libraries ----
 
 pacman::p_load('tidyverse', 
-               'igraph',
-               'vroom')
+               'igraph')
 
-#llamar a la red
+#Read graph ----
 
-matrix <- vroom(file = '/datos/rosmap/matriz_coexpre_20231011.txt')
-
-#subset pa aprender ---
-
-matrix_subset <- matrix[1:100, 1:100] %>% 
-  pivot_longer(cols = -gene, names_to = 'gene_to', values_to = 'mi') %>% 
-  filter(mi >= 0.5) 
-
-#hacer red a partir de data frame
-
-graph <- graph_from_data_frame(matrix_subset, 
-                      directed = F)  #por fin veo una red :'u
-
-#wacharla --
-
-plot(graph)
-
-#generalidades de la red ---
-
-components(graph) #saber cuantos componentes tiene
-
-degree(graph) #devuelve un vector donde para cada nodo tengo el valor de grado, es decir el numero de L
+graph <- read.graph(file = "noMCI_17112023_graph_MI0.532.graphml",
+                    format = "graphml")
 
 #coreness ----
 
 coreness <- coreness(graph) %>% 
   as.data.frame()
 
-coreness_3 <- coreness %>% 
-  filter(. == 3) #filtrar para tener solo esos cores
+#Histogram of the coreness distribution
 
-coreness_3 <- as.vector(rownames(coreness_3))
+hist(coreness$.)
+
+# Filtering by coreness -----
+
+coreness_25 <- coreness %>% 
+  filter(. >= 25) #filtrar para tener un grafo con nodos con un core max de 25
+
+hist(coreness_25$.)
+
+#Now the subgraph ----
+
+# Create a vector with the name of nodes I want to subset
+
+coreness_25v <- as.vector(rownames(coreness_25))
 
 #haciendo un subgrafo solo con los vertices de coreness_3
-subraph_kcore3 <- induced_subgraph(graph, vids = coreness_3)
+
+subraph_kcore3 <- induced_subgraph(graph, vids = coreness_25)
 
 #plotear 
 
@@ -56,14 +48,6 @@ save.image()
 
 graph_complete <- graph_from_data_frame(matrix, 
                                directed = F)  #por fin veo una red :'u
-
-
-#generalidades de la red ---
-
-components(graph_complete) #saber cuantos componentes tiene
-
-degree(graph_complete) #devuelve un vector donde para cada nodo tengo el valor de grado, es decir el numero de L
-
 #coreness ----
 
 coreness <- coreness(graph_complete) %>% 
@@ -75,7 +59,5 @@ coreness_3 <- coreness %>%
 coreness_3 <- as.vector(rownames(coreness_3))
 
 #haciendo un subgrafo solo con los vertices de coreness_3
+
 subraph_kcore3 <- induced_subgraph(graph, vids = coreness_3)
-
-
-
