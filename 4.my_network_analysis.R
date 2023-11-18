@@ -147,3 +147,42 @@ fineblanking_list <- lapply(fineblanking_cutoff_values, function(cutoff) {
 fineblanking_list_table <- bind_rows(fineblanking_list)
 
 #Cut will be at 0.532
+
+                     
+
+#Construct graph ----
+
+#MI>0.532
+
+matrix_MI_0.532 <- matrix_MI %>% 
+  filter(mi >= 0.532)
+
+graphMI_0.532 <- graph_from_data_frame(matrix_MI_0.532, 
+                               directed = F)
+#Components of new graph
+
+components(graphMI_0.532) # one component $csize of 18503
+
+#save graph ----
+
+#write_graph(graphMI_0.532, 
+#           file = 'noMCI_17112023_graph_MI0.532.graphml', 
+#           'graphml') #'edgelist.txt' / '.graphml'
+
+#Network generalities, run this only if you want to know ---
+
+#Summary 
+
+summary(graphMI_0.532) #nodes and edges
+
+#Degree by node 
+
+degree(graphMI_0.532) #devuelve un vector donde para cada nodo tengo el valor de grado, es decir el numero de L
+
+#edge betweenneess
+
+E(graph0.5)$betweenneess <- betweenness(graph0.5,
+                                          directed = F)
+
+#Next script is the coreness analysis 
+
