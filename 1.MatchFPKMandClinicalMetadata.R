@@ -29,11 +29,12 @@ colnames_woID[1] <- "gene_id"  #as we remove the last two characters we have to 
 
 fpkm_matrix <- counts[,(colnames_woID %in% RNA_seq_metadata$specimenID)] %>% 
   mutate(gene_id = counts$gene_id, .before = 1) %>%
-  rename_at(-1, ~str_sub(., end = -3))   # Elimina los dos últimos caracteres de los nombres de columna menos de la gene_id
+  rename_at(-1, ~str_sub(., end = -3))   # Deletes version number of ensembl genes, but not the gene_id col
 
 #
 
-RNA_seq_metadata <- RNA_seq_metadata[(RNA_seq_metadata$specimenID %in% colnames_woID),c(19,1,17)] %>%  # 19 = specimenID 1 = individualID 17 = cogdx
+RNA_seq_metadata <- RNA_seq_metadata[(RNA_seq_metadata$specimenID %in% colnames_woID),
+                                     c(19,1,17)] %>%  # 19 = specimenID 1 = individualID 17 = cogdx
   arrange(match(specimenID, colnames_woID[-1]))
 
 #Subset by cognitive diagnosis ------------------
@@ -51,7 +52,7 @@ RNA_seq_metadata <- RNA_seq_metadata[(RNA_seq_metadata$specimenID %in% colnames_
 
 #we dont need cogdx == 6
 
-#library for no MCI (sanos)
+#library for no MCI (no dementia known at the moment of death)
 
 cogdx1 <- RNA_seq_metadata %>% 
   filter(cogdx == 1)
@@ -71,7 +72,6 @@ cogdx4_5 <- RNA_seq_metadata %>%
   filter(cogdx == 4 | cogdx == 5)
 
 cogdx4_5v <- pull(cogdx4_5, specimenID)
-
 
 # Finally we subset RNAseq FPKMS by cogdx ----------
 
