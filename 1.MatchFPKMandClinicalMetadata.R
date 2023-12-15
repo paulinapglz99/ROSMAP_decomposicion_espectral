@@ -1,5 +1,6 @@
 #Script that Matchs FPKM files and and ClinicalMetadata to create FPKM subsets by cognitive diagnosis of AD and MCI
 #I also write a "designExp" metadata file for the QC
+#paulinapglz.99@gmail.com
 
 #Libraries  ----- 
 
@@ -38,6 +39,8 @@ RNA_seq_metadata <-  RNA_seq_metadata %>%
   filter(specimenID %in% colnames(counts)) %>%
   filter(is.na(exclude)) %>% 
   dplyr::select(individualID, specimenID, msex, cogdx, ceradsc) #I also added columns for designExp later
+dim(RNA_seq_metadata)
+#[1] 634   5
 
 #Subset by cognitive diagnosis ------------------
 
@@ -48,7 +51,7 @@ RNA_seq_metadata <-  RNA_seq_metadata %>%
 ##1 NCI: No cognitive impairment (No impaired domains)
 ##2 MCI: Mild cognitive impairment (One impaired domain) and NO other cause of CI
 ##3 MCI: Mild cognitive impairment (One impaired domain) AND another cause of CI
-##4 AD: Alzheimer’s dementia and NO other cause of CI (NINCDS PROB AD)
+##4 AD: Alzheimer’s dementia and NO other cause of CI (NINCDS PROB AD) 
 ##5 AD: Alzheimer’s dementia AND another cause of CI (NINCDS POSS AD)
 ##6 Other dementia: Other primary cause of dementia
 
@@ -58,8 +61,11 @@ RNA_seq_metadata <-  RNA_seq_metadata %>%
 
 cogdx1 <- RNA_seq_metadata %>% 
   filter(cogdx == 1)
+dim(cogdx1)
+# [1] 200   5
 
-cogdx1v <- pull(cogdx1, specimenID)
+#Alternatively, if we want only fully confirmed AD patients
+#we need 
 
 # For all MCI (mild cognitive impairment)
 
@@ -78,7 +84,7 @@ cogdx4_5v <- pull(cogdx4_5, specimenID)
 # Finally we subset RNAseq FPKMS by cogdx ----------
 
 FPKM_noMCI <- fpkm_matrix %>%
-  dplyr::select(gene_id, all_of(cogdx1v))
+  dplyr::select(gene_id, all_of(cogdx1v$specimenID))
 
 FPKM_MCI <- fpkm_matrix %>%
   dplyr::select(gene_id, all_of(cogdx2_3v))
@@ -93,4 +99,4 @@ FPKM_AD <- fpkm_matrix %>%
 #        file = 'FPKM_AD.csv', 
 #       delim = ',')
 
-#next script 2.mat_coexpre_rosmap
+#next script 2.script_mat_coexpre_rosmap
