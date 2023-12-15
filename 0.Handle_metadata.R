@@ -1,13 +1,12 @@
 #libraries  ----- 
 
-pacman::p_load("dplyr", 
-               'vroom')
+pacman::p_load("dplyr")
 
 #Handle metadata ---------------
 
-clinical_metadata <- vroom(file = 'ROSMAP_clinical.csv')
-
-biospecimen_metadata <- vroom(file = 'ROSMAP_biospecimen_metadata.csv')
+clinical_metadata <- vroom::vroom(file = '/datos/rosmap/metadata/ROSMAP_clinical.csv')
+                          
+biospecimen_metadata <- vroom::vroom(file = '/datos/rosmap/metadata/ROSMAP_biospecimen_metadata.csv')
 
 #merge metadata in one
 
@@ -23,8 +22,9 @@ cli_bio_metadata <- left_join(x = clinical_metadata,
 
 #read expression data
 
-FPKM_p1_p6 <- vroom(file = 'ROSMAP_RNAseq_FPKM_gene_plates_1_to_6_normalized.tsv')
-FPKM_p7_p8 <- vroom(file = 'ROSMAP_RNAseq_FPKM_gene_plates_7_to_8_normalized.tsv')
+FPKM_p1_p6 <- vroom::vroom(file = '/datos/rosmap/FPKM_data/ROSMAP_RNAseq_FPKM_gene_plates_1_to_6_normalized.tsv')
+
+FPKM_p7_p8 <- vroom::vroom(file = '/datos/rosmap/FPKM_data/ROSMAP_RNAseq_FPKM_gene_plates_7_to_8_normalized.tsv')
 
 #merge expression data
 
@@ -41,7 +41,7 @@ FPKM_p1_p8<-left_join(x=FPKM_p1_p6,
 
 FPKM_p1_p8 <- FPKM_p1_p8 %>% 
   dplyr::select(-c("tracking_id.x", "tracking_id.y", #remove inopportune data 
-            "492_120515_6", "492_120515_7")) 
+            "492_120515_6", "492_120515_7"))
 
 #note: I lost 2 samples (492_120515_6 and 492_120515_7)
 
