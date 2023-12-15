@@ -1,41 +1,43 @@
 #Script that Matchs FPKM files and and ClinicalMetadata to create FPKM subsets by cognitive diagnosis of AD and MCI
+#I also write a "designExp" metadata file for the QC
 
 #Libraries  ----- 
 
-pacman::p_load("dplyr", 
+pacman::p_load('dplyr', 
                'vroom', 
                'stringr')
 
 #Read data ---------
 
-counts <- vroom( file = 'RNAseq_FPKM_1_to_8_merged.csv' ) #ROSMAP RNAseq normalized counts
-metadata <- vroom( file = 'cli_bio_metadata.csv') #metadata for all assays
+counts <- vroom( file = '/datos/rosmap/FPKM_data/RNAseq_FPKM_1_to_8_merged.csv') #ROSMAP all plates RNAseq normalized counts
+metadata <- vroom( file = '/datos/rosmap/metadata/cli_bio_metadata.csv') #merged metadata for all assays
 
 #Simplify metadata to have only the RNAseq assays in brain
 
 RNA_seq_metadata <- metadata %>% 
   filter(assay == 'rnaSeq', 
-         organ == 'brain') 
+         organ == 'brain')
 
 #Remove the last two characters from geneID identifiers to match them with 
 #the RNASeq metadata
 
-colnames_woID <- substr(colnames(counts),1, nchar(colnames(counts))-2)
-colnames_woID[1] <- "gene_id"  #as we remove the last two characters we have to recompose the gene_id
+colnames(counts) <- substr(colnames(counts),1, nchar(colnames(counts))-2)
+colnames(counts)[1] <- "gene_id"  #as we remove the last two characters we have to recompose the gene_id
 
 # filter specific columns in the subset_counts array based on the values of "specimenID"
 #in RNA_seq_metadata and then add a new column "gene_id" in the first position of 
-#the result. the first position of the result.
+#the result.
 
-fpkm_matrix <- counts[,(colnames_woID %in% RNA_seq_metadata$specimenID)] %>% 
-  mutate(gene_id = counts$gene_id, .before = 1) %>%
-  rename_at(-1, ~str_sub(., end = -3))   # Deletes version number of ensembl genes, but not the gene_id col
+fpkm_matrix <- counts[,(colnames(counts) %in% RNA_seq_metadata$specimenID)] %>% 
+  mutate(gene_id = counts$gene_id, .before = 1)
+fpkm_matrix$gene_id <- str_sub(fpkm_matrix$gene_id,1, 15)
 
-#
+########### reparar este codigo
 
-RNA_seq_metadata <- RNA_seq_metadata[(RNA_seq_metadata$specimenID %in% colnames_woID),
-                                     c(19,1,17)] %>%  # 19 = specimenID 1 = individualID 17 = cogdx
-  arrange(match(specimenID, colnames_woID[-1]))
+RNA_seq_metadata <-  RNA_seq_metadata %>%
+  filter(specimenID %in% colnames(counts)) %>%
+  filter(is.na(exclude)) %>% 
+  dplyr::select(individualID, specimenID, msex, cogdx, ceradsc) #I also added columns for designExp later
 
 #Subset by cognitive diagnosis ------------------
 
@@ -48,7 +50,7 @@ RNA_seq_metadata <- RNA_seq_metadata[(RNA_seq_metadata$specimenID %in% colnames_
 ##3 MCI: Mild cognitive impairment (One impaired domain) AND another cause of CI
 ##4 AD: Alzheimer’s dementia and NO other cause of CI (NINCDS PROB AD)
 ##5 AD: Alzheimer’s dementia AND another cause of CI (NINCDS POSS AD)
-#36 Other dementia: Other primary cause of dementia
+##6 Other dementia: Other primary cause of dementia
 
 #we dont need cogdx == 6
 
@@ -91,4 +93,4 @@ FPKM_AD <- fpkm_matrix %>%
 #        file = 'FPKM_AD.csv', 
 #       delim = ',')
 
-#next script 1.script_mat_coexpre_rosmap
+#next script 2.mat_coexpre_rosmap
