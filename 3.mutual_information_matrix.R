@@ -1,4 +1,5 @@
 #Script que hace mutual information para datos de expresion RNAseq de ROSMAP
+#paulinapglz.99@gmail.com
 
 pacman::p_load('future', 
              'tidyverse', 
@@ -6,23 +7,19 @@ pacman::p_load('future',
              'furrr', 
              'vroom')
 
-#Set directory ---------
-
-setwd(dir = '/datos/home/paulinapg/redesROSMAP/')
-
 #set timer ---- 
 
 tempus <- Sys.time()
 
 #read data ----------
 
-protcod <- vroom(file = 'protcod_MCI.txt')
+protcod <- vroom(file = '/datos/rosmap/discretized_matrix/protcod_AD.txt')  #change for every desired diagnosis 
 
-mat_dis <- vroom(file = 'mat_dis_MCI.txt')
+mat_dis <- vroom(file = '/datos/rosmap/discretized_matrix/mat_dis_AD.txt')
 
 # indexing data --------------
 
-my_index <- pull(protcod, 'gene_id') #de otro dataset not here pero que tenia en mi ambiente, ese esta en recap.R
+my_index <- pull(protcod, 'gene_id') #to rename matrix
 
 #Quiero un vector que tenga los conteos de cada elemento de otro vector
 
