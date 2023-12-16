@@ -147,9 +147,9 @@ dim(valores_expre)
 
 gene_names <- pull(protcod, 'gene_id')
 
-#vroom_write(protcod, 
-#            file = 'protcod_AD.txt',  #this for MCI and noMCI also
-#           delim = ',')
+vroom_write(protcod, 
+            file = '/datos/rosmap/discretized_matrix/protcod_AD.txt',  #this for MCI and noMCI also
+            delim = ',')
 
 ####  Data discretization
 #this generates a discretized expression matrix
