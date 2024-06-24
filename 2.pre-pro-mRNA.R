@@ -15,19 +15,22 @@ pacman::p_load('dplyr',
                'EDASeq', 
                "ggplot2")
 
+#
+
+set.seed(10)
 #Get the data --- ---
 
 #Read counts data, this was already filtered by 1.QC_pre_analysis.R
 
 counts <- vroom::vroom(file = '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/full_counts/ROSMAP_RNAseq_filtered_counts_DLPFC.txt') %>% as.data.frame()
 dim(counts)
-#[1] 60558   638
+#[1] 60558   1142
 
 #Obtain factors from metadata --- --- 
 
 metadata <- vroom::vroom(file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/DLPFC/RNA_seq_metadata_filtered_DLPFC.txt")
 dim(metadata)
-#[1] 637  41
+#[1] 1141  41
 
 #I do this to make sure the rowlength of factors match with the counts columns, it is like metadata filtering
 
@@ -37,19 +40,20 @@ factors <- data.frame("specimenID" = colnames(counts)[-1])
 
 factors <- factors %>% left_join(metadata, by = "specimenID")
 
-factors <- factors %>% dplyr::select(c(specimenID, libraryBatch, RIN , NIA_reagan_ADLikelihood, dicho_NIA_reagan, cogdx))
+factors <- factors %>% dplyr::select(c(specimenID, sequencingBatch, RIN, dicho_NIA_reagan))
 
-factors <- factors %>% filter(!is.na(NIA_reagan_ADLikelihood))
+factors <- factors %>% filter(!is.na(dicho_NIA_reagan))
 dim(factors)
 #[1] 446  4
 #[1] 499   6 <- 
+#[1] 880   4
 
 #Filter again counts
 
 counts <- counts %>% dplyr::select(1,intersect(colnames(counts), factors$specimenID))
 dim(counts)
-#[1] 60558   447
-#[1] 60558   500 <- 
+#[1] 60558   500 
+#[1] 60558   881 <-
 
 #Set names to rows 
 
@@ -199,7 +203,7 @@ dev.off()
 #Plot for Mvalues
 
 png("MvaluesOri.png")
-explo.plot(mycd,samples=sample(1:ncol(counts),10))
+explo.plot(mycd,samples=sample(1:100,10))
 dev.off()
 
 #4)check for length & GC bias
@@ -266,8 +270,8 @@ abline(h=0.32,col=4)#h hardcoded
 #CPM>0.32
 #Plotted cpm_counts vs counts and 0.32 is the intersection, this may change and it is hardcoded
 
-countMatrixFiltered <- filtered.data(counts[-1], 
-                                     factor = factors$libraryBatch,       #using all factors
+countMatrixFiltered <- filtered.data(counts[,-1], 
+                                     factor = factors$sequencingBatch,       #using all factors
                                      norm = F,            #counts are not normalized 
                                      depth = NULL,        #Sequencing depth of samples (column totals before normalizing the data). Depth only needs to be provided when method = 3 and norm = TRUE. 
                                      method = 1,          #Method 1 (CPM) removes those features that have an average expression per condition less than cpm value and a coefficient of variation per condition higher than cv.cutoff (in percentage) in all the conditions
@@ -276,6 +280,8 @@ countMatrixFiltered <- filtered.data(counts[-1],
 dim(countMatrixFiltered)
 #[1] 22217   446
 #[1] 22191   499? <-
+
+#[1] 26158   880
 
 #Filtering out low count features...
 #22225 features are to be kept for differential expression analysis with filtering method 1
@@ -289,6 +295,7 @@ myannot <- myannot %>% filter(feature %in% rownames(countMatrixFiltered))
 dim(myannot)
 #[1] 22095     7
 #[1] 22071     7? <- 
+#[1] 25943     7
 
 myannot <- myannot[!duplicated(myannot$feature), ]
 dim(myannot)
@@ -309,6 +316,7 @@ rownames(featureData) <- featureData$feature
 dim(featureData)
 #[1] 22094     7
 #[1] 22070     7? <- 
+#[1] 25941   7
 
 #Pheno data
 
@@ -318,7 +326,8 @@ rownames(phenoData) <- phenoData$specimenID
 
 dim(phenoData)
 #[1] 446   4
-#[1] 499   6 <-
+#[1] 499   6
+#[1] 880   4 <-
 
 ##Create EDA object --- --
 
@@ -400,7 +409,7 @@ table(mycd_norm@dat$DiagnosticTest[,  "Diagnostic Test"])
 #specified in Variability. 
 
 norm_ARSyn <- ARSyNseq(noiseqData_norm_count,      #Biobases eSet object
-                       factor = "libraryBatch",    #when NULL, all factors are considered
+                       factor = "sequencingBatch",    #when NULL, all factors are considered
                        batch = T,                  #TRUE if factor argument is batch info
                        norm = "n",                 #type of normalization, "n" if already normalized
                        logtransf = F)              #If F, log-transformation will be applied before ARSyn
@@ -419,7 +428,7 @@ myPCA_ARSyn <- dat(norm_ARSyn,
 png("postArsynPCA.png")
 explo.plot(myPCA_ARSyn, samples = c(1,2),
            plottype = "scores", 
-           factor = "libraryBatch")
+           factor = "sequencingBatch")
 dev.off()
 
 #Save PCA file
@@ -446,7 +455,7 @@ pca_norm_ARSyn <- prcomp(pca_norm_ARSyn, retx = TRUE, center = TRUE, scale. = FA
 
 #PCA to table
 
-pca_norm_ARSyn_df <- pca_norm_ARSyn$x %>% as.data.frame() %>% rownames_to_column(var = 'specimenID')
+pca_norm_ARSyn_df <- pca_norm_ARSyn$x %>% as.data.frame() 
 
 # Create a data frame with PC number and percentage of variance
 
@@ -460,11 +469,11 @@ variance_table_norm_ARSyn <- data.frame(
 
 #Plot by color
 
-PC1_PC2_norm_ARSyn_library_batch <- pca_norm_ARSyn_df %>% 
+PC1_PC2_norm_ARSyn_batch <- pca_norm_ARSyn_df %>% 
   ggplot() +
-  aes(x = PC1, y = PC2, colour = as.factor(factors$libraryBatch)) +
+  aes(x = PC1, y = PC2, colour = as.factor(factors$sequencingBatch)) +
   geom_point() +
-  geom_text(mapping = aes(label = specimenID)) +
+  geom_text(mapping = aes(label = factors$specimenID)) +
   labs(title = "PCA Scatterplot coloured by library batch",
        subtitle = "PC1 vs PC2", 
        x = paste("PC1 (", sprintf("%.2f", variance_table_norm_ARSyn$Variance_Percentage[1]), "%)"),
@@ -475,7 +484,7 @@ PC1_PC2_norm_ARSyn_NIA <- pca_norm_ARSyn_df %>%
   ggplot() +
   aes(x = PC1, y = PC2, colour = as.factor(factors$dicho_NIA_reagan)) +
   geom_point() +
-  geom_text(mapping = aes(label = specimenID)) +
+  geom_text(mapping = aes(label = factors$specimenID)) +
   labs(title = "PCA Scatterplot coloured by library batch",
        subtitle = "PC1 vs PC2", 
        x = paste("PC1 (", sprintf("%.2f", variance_table_norm_ARSyn$Variance_Percentage[1]), "%)"),
@@ -536,7 +545,7 @@ dev.off()
 mylenBias <- dat(noiseqData_final, 
                  k = 0, 
                  type = "lengthbias", 
-                 factor = "libraryBatch",
+                 factor = "sequencingBatch",
                  norm=T)
 
 #Plot final length bias
@@ -620,14 +629,14 @@ dim(final_metadata)
 
 #Finally, save counts table --- ---
 
-#vroom::vroom_write(final_counts, file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/ROSMAP_RNAseq_filteredQC_counts_DLPFC.txt")
+vroom::vroom_write(final_counts, file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/full_counts/ROSMAP_RNAseq_filteredQC_counts_DLPFC.txt")
 
 #Save filtered metadata --- ---
 
-#vroom::vroom_write(final_metadata, file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/DLPFC/RNA_seq_metadata_filteredQC_DLPFC.txt")
+vroom::vroom_write(final_metadata, file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/DLPFC/RNA_seq_metadata_filteredQC_DLPFC.txt")
 
 #Save annotation --- --- 
 
-#vroom::vroom_write(myannot, file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/DLPFC/RNA_seq_filteredQC_annotation_DLPFC.txt")
+vroom::vroom_write(myannot, file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/DLPFC/RNA_seq_filteredQC_annotation_DLPFC.txt")
 
 #END

@@ -15,9 +15,9 @@ pacman::p_load("tidyverse",
 
 #Get data --- --- 
 
-counts <- vroom::vroom(file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/ROSMAP_RNAseq_rawcounts_DLPFC.txt")
+counts <- vroom::vroom(file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/full_counts/ROSMAP_RNAseq_rawcounts_DLPFC.txt")
 dim(counts)
-#[1] 60606   891 for DLFPC
+#[1] 60607  1142 for DLFPC
 
 #Obtain factors from metadata
 
@@ -29,36 +29,64 @@ dim(metadata)
 
 #If needed, trim first rows
 
-counts <- counts[-c(1:3), ]
+counts <- counts[-c(1:4), ]
 
 # Delete the "_PAR_Y" elements
 
 counts <- counts[-grep("_PAR_Y", counts$feature),]
 dim(counts)
-# [1] 60558   891
+# [1] 60558  1142
 
 #Prepare feature column
 
 counts <- counts %>% mutate(feature = str_remove(feature, "\\..*$"), .before = 1)
 dim(counts)
-#[1] 60558   891
+#[1] 60603  1142
 
 #Create sub metadata
 
-sub_metadata <- metadata %>% filter(!is.na(libraryBatch))
-dim(sub_metadata)
-#[1] 637  41
+metadata <- metadata %>% filter(!is.na(sequencingBatch))
+dim(metadata)
+#[1] 1141  41
 
-sub_counts <- counts %>% dplyr::select(c(1, any_of(sub_metadata$specimenID)))
-dim(sub_counts)
-#[1] 60558   638
+counts <- counts %>% dplyr::select(c(1, any_of(metadata$specimenID)))
+dim(counts)
+#[1] 60558   1142
+
+#If needed, delete duplicates
+# 
+# # Verificar duplicados en la columna 'feature'
+# duplicated_features <- counts$feature[duplicated(counts$feature)]
+# length(duplicated_features)
+# 
+# # Ver las filas duplicadas
+# duplicated_rows <- counts[counts$feature %in% duplicated_features, ]
+# dim(duplicated_rows)
+# 
+# duplicated_rows <- duplicated_rows[order(duplicated_rows$feature),]
+# 
+# duplicated_rows <- duplicated_rows %>%
+#   group_by(feature) %>%
+#   summarize(across(everything(), median, na.rm = TRUE))
+# dim(duplicated_rows)
+# 
+# #Delete rows in the matrix
+# 
+# counts <- counts %>% filter(!feature  %in% duplicated_rows$feature)
+# dim(counts)
+# counts <- bind_rows(counts, duplicated_rows)
+# dim(counts)
+# #[1] 60558  1142
+# 
+# # Convertir las columnas seleccionadas a enteros usando dplyr
+# counts <- counts %>% mutate(across(-feature, as.integer))
 
 #PCA --- ---
 
 #Build matrix
 
-pca_matrix <- sub_counts %>% 
-  column_to_rownames("feature") %>% 
+pca_matrix <- counts %>% 
+ column_to_rownames("feature") %>% 
   as.matrix() %>% 
   t()  # transpose the matrix so that rows = samples and columns = variables, this because dots in the PCA scatterplot will be the ones in the rows
 
@@ -117,13 +145,13 @@ autoplot(pca, label = TRUE)
 
 #Option 2: use ggplot 
 
-#Colour by library batch --- ---
+#Colour by sequencingBatch --- ---
 
 #Plot PC1 and PC2
 
 PC1_PC2_librarybatch <- pca_df %>% 
   ggplot() +
-  aes(x = PC1, y = PC2, colour = as.factor(sub_metadata$libraryBatch)) +
+  aes(x = PC1, y = PC2, colour = as.factor(metadata$sequencingBatch)) +
   geom_point() +
   geom_text(mapping = aes(label = specimenID)) +
   labs(title = "PCA Scatterplot coloured by library batch",
@@ -131,12 +159,13 @@ PC1_PC2_librarybatch <- pca_df %>%
        x = paste("PC1 (", sprintf("%.2f", variance_table$Variance_Percentage[1]), "%)"),
        y = paste("PC2 (",  sprintf("%.2f", variance_table$Variance_Percentage[2]), "%)")) +
   theme_minimal()
+PC1_PC2_librarybatch
 
 #Plot PC1 and PC3
 
 PC1_PC3_librarybatch <- pca_df %>% 
   ggplot() +
-  aes(x = PC1, y = PC3, colour = as.factor(sub_metadata$libraryBatch)) +
+  aes(x = PC1, y = PC3, colour = as.factor(metadata$sequencingBatch)) +
   geom_point() +
   geom_text(mapping = aes(label = specimenID)) +
   labs(title = "PCA Scatterplot coloured by library batch",
@@ -149,51 +178,10 @@ PC1_PC3_librarybatch <- pca_df %>%
 
 PC2_PC3_librarybatch <- pca_df %>% 
   ggplot() +
-  aes(x = PC2, y = PC3, colour = as.factor(sub_metadata$libraryBatch)) +
+  aes(x = PC2, y = PC3, colour = as.factor(metadata$sequencingBatch)) +
   geom_point() +
   geom_text(mapping = aes(label = specimenID))  +
   labs(title = "PCA Scatterplot coloured by library batch",
-       subtitle = "PC2 vs PC3", 
-       x = paste("PC2 (", sprintf("%.2f", variance_table$Variance_Percentage[2]), "%)"),
-       y = paste("PC3 (",  sprintf("%.2f", variance_table$Variance_Percentage[3]), "%)")) +
-  theme_minimal()
-
-#By sequencing batch --- ---
-
-#PC1 and PC2
-
-PC1_PC2_seq_batch <- pca_df %>% 
-  ggplot() +
-  aes(x = PC1, y = PC2, colour = as.factor(sub_metadata$sequencingBatch)) +
-  geom_point() +
-  geom_text(mapping = aes(label = specimenID)) +
-  labs(title = "PCA Scatterplot coloured by sequencing batch",
-       subtitle = "PC1 vs PC2", 
-       x = paste("PC1 (", sprintf("%.2f", variance_table$Variance_Percentage[1]), "%)"),
-       y = paste("PC2 (",  sprintf("%.2f", variance_table$Variance_Percentage[2]), "%)")) +
-  theme_minimal()
-
-#Plot PC1 and PC3
-
-PC1_PC3_seq_batch <- pca_df %>% 
-  ggplot() +
-  aes(x = PC1, y = PC3, colour = as.factor(sub_metadata$sequencingBatch)) +
-  geom_point() +
-  geom_text(mapping = aes(label = specimenID)) +
-  labs(title = "PCA Scatterplot coloured by sequencing batch",
-       subtitle = "PC1 vs PC3",
-       x = paste("PC1 (", sprintf("%.2f", variance_table$Variance_Percentage[1]), "%)"),
-       y = paste("PC3 (",  sprintf("%.2f", variance_table$Variance_Percentage[3]), "%)")) +
-  theme_minimal()
-
-#Plot PC2 and PC3
-
-PC2_PC3_seq_batch <- pca_df %>% 
-  ggplot() +
-  aes(x = PC2, y = PC3, colour = as.factor(sub_metadata$sequencingBatch)) +
-  geom_point() +
-  geom_text(mapping = aes(label = specimenID))  +
-  labs(title = "PCA Scatterplot coloured by sequencing batch",
        subtitle = "PC2 vs PC3", 
        x = paste("PC2 (", sprintf("%.2f", variance_table$Variance_Percentage[2]), "%)"),
        y = paste("PC3 (",  sprintf("%.2f", variance_table$Variance_Percentage[3]), "%)")) +
@@ -205,7 +193,7 @@ PC2_PC3_seq_batch <- pca_df %>%
 
 PC1_PC2_study_batch <- pca_df %>% 
   ggplot() +
-  aes(x = PC1, y = PC2, colour = as.factor(sub_metadata$Study)) +
+  aes(x = PC1, y = PC2, colour = as.factor(metadata$Study)) +
   geom_point() +
   geom_text(mapping = aes(label = specimenID)) +
   labs(title = "PCA Scatterplot coloured by study batch",
@@ -218,7 +206,7 @@ PC1_PC2_study_batch <- pca_df %>%
 
 PC1_PC3_study_batch <- pca_df %>% 
   ggplot() +
-  aes(x = PC1, y = PC3, colour = as.factor(sub_metadata$Study)) +
+  aes(x = PC1, y = PC3, colour = as.factor(metadata$Study)) +
   geom_point() +
   geom_text(mapping = aes(label = specimenID)) +
   labs(title = "PCA Scatterplot coloured by study batch",
@@ -242,9 +230,9 @@ PC2_PC3_study_batch<- pca_df %>%
 
 # By cognitive diagnosis --- ---
 
-PC1_PC2_study_batch <- pca_df %>% 
+PC1_PC2_cogdx <- pca_df %>% 
   ggplot() +
-    aes(x = PC1, y = PC2, colour = as.factor(sub_metadata$cogdx)) +
+    aes(x = PC1, y = PC2, colour = as.factor(metadata$cogdx)) +
   geom_point() +
   geom_text(mapping = aes(label = specimenID)) +
   labs(title = "PCA Scatterplot coloured by study batch",
@@ -254,18 +242,18 @@ PC1_PC2_study_batch <- pca_df %>%
   theme_minimal()
 
 #Grid plots
-
-PC1_PC2 <- grid.arrange(PC1_PC2_librarybatch, PC1_PC2_seq_batch, PC1_PC2_study_batch)
-
-PC1_PC3 <- grid.arrange(PC1_PC3_librarybatch, PC1_PC3_seq_batch, PC1_PC3_study_batch)
-
-PC2_PC3 <- grid.arrange(PC2_PC3_librarybatch, PC2_PC3_seq_batch, PC2_PC3_study_batch)
+# 
+# PC1_PC2 <- grid.arrange(PC1_PC2_librarybatch, PC1_PC2_seq_batch, PC1_PC2_study_batch)
+# 
+# PC1_PC3 <- grid.arrange(PC1_PC3_librarybatch, PC1_PC3_seq_batch, PC1_PC3_study_batch)
+# 
+# PC2_PC3 <- grid.arrange(PC2_PC3_librarybatch, PC2_PC3_seq_batch, PC2_PC3_study_batch)
 
 #Save plots
-
-ggsave("/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/bias_plots/PC1_PC2_batches.png", PC1_PC2, height = 25,  dpi = 300)
-ggsave("/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/bias_plots/PC1_PC3_batches.png", PC1_PC3, height = 25,  dpi = 300)
-ggsave("/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/bias_plots/PC2_PC3_batches.png", PC2_PC3, height = 25,  dpi = 300)
+# 
+# ggsave("/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/bias_plots/PC1_PC2_batches.png", PC1_PC2, height = 25,  dpi = 300)
+# ggsave("/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/bias_plots/PC1_PC3_batches.png", PC1_PC3, height = 25,  dpi = 300)
+# ggsave("/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/bias_plots/PC2_PC3_batches.png", PC2_PC3, height = 25,  dpi = 300)
 
 #Loading plot for PC1 --- ---
 
@@ -323,29 +311,31 @@ barplot(pca$rotation[,1])
 
 ## Filtering out lowly expressed genes
 
-mycpm <- cpm(sub_counts[-1])
+mycpm <- cpm(counts[-1])
 
-rownames(mycpm) <- sub_counts$feature
+rownames(mycpm) <- counts$feature
 dim(mycpm)
 #[1] 60558   637
 
 #Plot cpm vs counts
 
-plot(sub_counts[[2]],mycpm[,1],xlim=c(0,20),ylim=c(0,0.5))
+plot(counts[[2]],mycpm[,1],xlim=c(0,20),ylim=c(0,0.5))
 abline(v=10,col=2)
-abline(h=0.32,col=4)
+abline(h=0.15,col=4)
 
-thresh <- mycpm > 0.32
+thresh <- mycpm > 0.15
 keep <- rowSums(thresh) >= 3
 table(keep)
 
 #FALSE  TRUE 
 #32426 28132 
+#17155 43403 
 
-counts.keep <- sub_counts[keep,]
+counts.keep <- counts[keep,]
 dim(counts.keep)
 #[1] 33524   638
 #[1] 28132   638???
+#[1] 43403  1142 <- el bueno DLPFC
 
 #counts.keep[1:5, 1:5]
 
@@ -388,9 +378,9 @@ variance_table_logcpm <- data.frame(
 
 #Plot by color
  
-PC1_PC2_logcpm_librarybatch <- PCA_cpm_log2_df %>% 
+PC1_PC2_logcpm_batch <- PCA_cpm_log2_df %>% 
   ggplot() +
-  aes(x = PC1, y = PC2, colour = as.factor(filtered_sub_metadata$libraryBatch)) +
+  aes(x = PC1, y = PC2, colour = as.factor(metadata$sequencingBatch)) +
   geom_point() +
   geom_text(mapping = aes(label = specimenID)) +
   labs(title = "PCA Scatterplot coloured by library batch",
@@ -403,7 +393,7 @@ PC1_PC2_logcpm_librarybatch <- PCA_cpm_log2_df %>%
 
 PC1_PC2_logcpm_seqbatch <- PCA_cpm_log2_df %>% 
   ggplot() +
-    aes(x = PC1, y = PC2, colour = as.factor(filtered_sub_metadata$sequencingBatch)) +
+    aes(x = PC1, y = PC2, colour = as.factor(metadata$sequencingBatch)) +
   geom_point() +
   geom_text(mapping = aes(label = specimenID)) +
   labs(title = "PCA Scatterplot coloured by seq batch",
@@ -426,10 +416,10 @@ legend("topright", legend = levels(as.factor(targets$Group)), fill=c("red","blue
 
 #Save metadata
 
-#vroom::vroom_write(sub_metadata, file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/DLPFC/RNA_seq_metadata_filtered_DLPFC.txt")
+vroom::vroom_write(metadata, file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/DLPFC/RNA_seq_metadata_filtered_DLPFC.txt")
 
 #Save counts
 
-#vroom::vroom_write(sub_counts, file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/ROSMAP_RNAseq_filtered_counts_DLPFC.txt")
+vroom::vroom_write(counts, file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/full_counts/ROSMAP_RNAseq_filtered_counts_DLPFC.txt")
 
 #END

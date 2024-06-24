@@ -15,7 +15,7 @@ pacman::p_load("tidyverse",
 
 metadata <- vroom::vroom(file = '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/DLPFC/RNA_seq_metadata_filteredQC_DLPFC.txt')
 dim(metadata)
-#[1] 497  41
+#[1] 878  41
 
 #Subset by diagnosis --- ---
 
@@ -24,15 +24,15 @@ dim(metadata)
 specimenID_wNIA_reagan <- metadata %>% 
   filter(!is.na(dicho_NIA_reagan))
 dim(specimenID_wNIA_reagan)
-#[1] 497  41
+#[1] 878  41
 
 AD_pathology <- metadata %>% filter(dicho_NIA_reagan == 1)
 dim(AD_pathology)
-#[1] 181  41
+#[1] 571  41
 
 no_AD_pathology <-metadata %>% filter(dicho_NIA_reagan == 0)
 dim(no_AD_pathology)
-#[1] 316  41
+#[1] 307  41
 
 #Alternatively, for clinical diagnosis --- --- 
 
@@ -59,15 +59,17 @@ dim(AD_cogdx)
 
 #Read counts data --- ---
 
-counts <- vroom::vroom(file = '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/ROSMAP_RNAseq_filteredQC_counts_DLPFC.txt') #Aqui es donde van los conteos de RNASeq
+counts <- vroom::vroom(file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/full_counts/ROSMAP_RNAseq_filteredQC_counts_DLPFC.txt") #Aqui es donde van los conteos de RNASeq
 dim(counts) 
-#[1] 22070   498
+#[1] 25941   879
 
 ####  Data discretization --- ---
 
 #this generates a discretized expression matrix
 
 mat_dis <- infotheo::discretize(t(counts[-1])) # I t() because we want genes to be columns to calculate MI in next script
+dim(mat_dis)
+#
 
 #Regenerate gene names in cols and specimenIDs in rows
 
@@ -83,20 +85,19 @@ mat_dis <- mat_dis %>% mutate(specimenID = colnames(counts)[-1], .before = 1)
 
 AD_pathology_counts <- mat_dis %>% dplyr::filter(specimenID %in% AD_pathology$specimenID)
 dim(AD_pathology_counts)
-#[1] 22070   182
-#[1]   181 22071 <-
+#[1]   571 25942
 
 #To obtain all NIA_reagan noAD counts
 
 noAD_pathology_counts <- mat_dis %>% dplyr::filter(specimenID %in% no_AD_pathology$specimenID)
 dim(noAD_pathology_counts)
-#[1]   316 22071
+#[1]   307 25942
 
 #Save discretized matrix --- --- 
 
-#vroom::vroom_write(AD_pathology_counts, file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/ROSMAP_DLFPC_AD_NIAReagan_discretizedmatrix.txt")
+vroom::vroom_write(AD_pathology_counts, file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/ROSMAP_DLFPC_AD_NIAReagan_discretizedmatrix.txt")
 
-#vroom::vroom_write(noAD_pathology_counts, file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/ROSMAP_DLFPC_noAD_NIAReagan_discretizedmatrix.txt")
+vroom::vroom_write(noAD_pathology_counts, file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/ROSMAP_DLFPC_noAD_NIAReagan_discretizedmatrix.txt")
 
 #Subset RNAseq counts by clinical var --- ---
 
