@@ -48,7 +48,7 @@ repeated_values <- counts %>%
   pull(feature)
 length(repeated_values)
 
-# Ver las filas duplicadas
+# Delete duplicates
 repeated_rows <- counts[counts$feature %in% repeated_values, ]
 dim(repeated_rows)
 
@@ -144,9 +144,9 @@ dim(res.df)
 
 # add a column of NAs
 res.df$diffexpressed <- "NO"
-# if log2Foldchange > 1 and pvalue < 0.05, set as "UP" 
+# if log2Foldchange > 0.5 and pvalue < 0.05, set as "UP" 
 res.df$diffexpressed[res.df$log2FoldChange > 0.5 & res.df$padj < 0.05] <- "UP"
-# if log2Foldchange < 1 and pvalue < 0.05, set as "DOWN"
+# if log2Foldchange < -0.5 and pvalue < 0.05, set as "DOWN"
 res.df$diffexpressed[res.df$log2FoldChange < -0.5 & res.df$padj < 0.05] <- "DOWN"
 
 table(res.df$diffexpressed)

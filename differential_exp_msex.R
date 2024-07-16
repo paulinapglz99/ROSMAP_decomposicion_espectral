@@ -10,12 +10,13 @@
 
 #BiocManager::install("DESeq2")
 
-pacman::p_load("dplyr", 
+pacman::p_load("tidyverse", 
                "DESeq2", 
                "pheatmap", 
                "ggplot2", 
                "ggrepel", 
                "biomaRt", 
+               "stringr",
                "RColorBrewer")
 
 #Set seed --- --- 
@@ -101,60 +102,154 @@ dim(dds)
 
 #Specify conditions to compare
 #Establishing 
-dds$dicho_NIA_reagan <- relevel(dds$condition, ref = "0")
+dds$condition <- relevel(dds$condition, ref = "msex_0_NR_0")
 
 dds <- DESeq(dds)  #Slow
 
 #Results
 
-lfch = log2(1.3)
+#Contrast "msex_0_NR_0", "msex_0_NR1" (Healthy and sick women)
 
-res <- results(dds, contrast = c("dicho_NIA_reagan", "0", "1"), 
-               #  lfcThreshold = lfch_mario, 
+res_msex_0_NR_0_NR_1 <- results(dds, contrast = c("condition", "msex_0_NR_1", "msex_0_NR_0"), 
                pAdjustMethod = 'BH', 
                alpha = 0.01)
 
-#How many adjusted p-values were less than 0.1?
-sum(res$padj < 0.05, na.rm=TRUE)
-#[1] 4914
+#Contrast "msex_1_NR_0", "msex_1_NR1" (Healthy and sick men)
 
-#Order results by p-value adjusted
-res.df <- res.df[order(abs(res.df$log2FoldChange), decreasing = T),] %>% as.data.frame()
+res_msex_1_NR_0_NR_1 <- results(dds, contrast = c("condition", "msex_0_NR_1", "msex_0_NR_0"), 
+                                pAdjustMethod = 'BH', 
+                                alpha = 0.01)
 
-# add a column of NAs
-res.df$diffexpressed <- "NO"
-# if log2Foldchange > 1 and pvalue < 0.05, set as "UP" 
-res.df$diffexpressed[res.df$log2FoldChange > 0.37 & res.df$padj < 0.05] <- "UP"
-# if log2Foldchange <  and pvalue < 0.05, set as "DOWN"
-res.df$diffexpressed[res.df$log2FoldChange < -0.37 & res.df$padj < 0.05] <- "DOWN"
+#Contrast "msex_0_NR_1", "msex_1_NR_1"(Sick women and sick men)
 
-table(res.df$diffexpressed)
+res_NR_1_msex_0_msex_1 <- results(dds, contrast = c("condition", "msex_0_NR_1", "msex_1_NR_1"), 
+               pAdjustMethod = 'BH', 
+               alpha = 0.01)
 
-#DLPFC
-# 
-# DOWN    NO    UP 
-# 21 30624    13 
+#Contrast "msex_0_NR_1", "msex_1_NR_1"(Healthy women and Healthy men)
 
-#Add gene names in SYMBOL --- ---
+res_NR_1_msex_0_msex_1 <- results(dds, contrast = c("condition", "msex_0_NR_0", "msex_1_NR_0"), 
+                                  pAdjustMethod = 'BH', 
+                                  alpha = 0.01)
 
-#Remove version gene
-rownames(res.df) <- str_remove(rownames(res.df), "\\..*$")
+#Create a list 
 
-#Create dictionary
-symbol <- convert_ens_to_symbol(rownames(res.df))
-symbol$external_gene_name <- ifelse(symbol$external_gene_name == "", symbol$ensembl_gene_id, symbol$external_gene_name)
-#merge
+res <- list(res_msex_0_NR_0_NR_1 = res_msex_0_NR_0_NR_1, 
+            res_msex_1_NR_0_NR_1 = res_msex_1_NR_0_NR_1, 
+            res_NR_1_msex_0_msex_1 = res_NR_1_msex_0_msex_1, 
+            res_NR_1_msex_0_msex_1 = res_NR_1_msex_0_msex_1)
 
-# Make rownames columns
-res.df <- res.df %>% mutate(ensembl_gene_id = rownames(.), .before = 1) 
-res.df <- res.df %>% left_join(symbol, by = "ensembl_gene_id") #merge
+# Contar el número de p-valores ajustados menores a 0.05 en cada resultado
+adjp <- sapply(res, function(x) sum(x$padj < 0.05, na.rm = TRUE))
 
-#Extract DEGs --- ---
+res.f <- function(res) {
+  #ordenar el data frame por padj
+  res.df <- as.data.frame(res)
+  res.df <- res.df[order(res.df$padj, decreasing = FALSE), ]
+  # Convertir a data frame
+  res.df <- as.data.frame(res)
+  # Ordenar por log2FoldChange en orden decreciente
+  res.df <- res.df[order(abs(res.df$log2FoldChange), decreasing = TRUE),]
+  # Añadir una columna de NAs
+  res.df$diffexpressed <- "NO"
+  # Clasificar según log2FoldChange y p-valor ajustado
+  res.df$diffexpressed[res.df$log2FoldChange > 0.5 & res.df$padj < 0.05] <- "UP"
+  res.df$diffexpressed[res.df$log2FoldChange < -0.5 & res.df$padj < 0.05] <- "DOWN"
+  rownames(res.df) <- str_remove(rownames(res.df), "\\..*$")
+  #Create dictionary
+  symbol <- convert_ens_to_symbol(rownames(res.df))
+  symbol$external_gene_name <- ifelse(symbol$external_gene_name == "", symbol$ensembl_gene_id, symbol$external_gene_name)
+  #merge
+  
+  # Make rownames columns
+  res.df <- res.df %>% mutate(ensembl_gene_id = rownames(.), .before = 1) 
+  res.df <- res.df %>% left_join(symbol, by = "ensembl_gene_id") #merge
+  #Create labels for Vplot
+  res.df <- res.df %>% mutate(delabel = ifelse(diffexpressed != "NO", external_gene_name, NA ))
+  return(res.df)
+}
 
-DEGS <- res.df %>% filter(diffexpressed != "NO")
-rownames(DEGS) <- DEGS$ensembl_gene_id
-dim(DEGS)
-#[1] 4130    9
+# Función para extraer DEGs
+DEGs.f <- function(res.df) {
+  DEGS <- res.df %>% filter(diffexpressed != "NO")
+  rownames(DEGS) <- DEGS$ensembl_gene_id
+  return(DEGS)
+}
+
+# Aplicar la función a cada elemento de la lista
+res.df <- lapply(res, res.f)
+
+# Aplicar la función a cada elemento de la lista
+DEGs.df <- lapply(res.df, DEGs.f)
+
+# Mostrar las dimensiones de cada data frame de DEGs
+DEGs_dims <- lapply(DEGs.df, dim)
+DEGs_dims
+
+# BaseMean by condition --- ---
+
+#Extract counts normalized 
+
+normcounts <- counts(dds, normalized = TRUE) %>% as.data.frame()
+
+# Calcula los valores de baseMean por condición
+
+# Definir las condiciones únicas
+conditions <- unique(coldata$condition)
+
+# Crear una lista para almacenar los data frames de baseMean
+baseMeans_list <- list()
+
+# Calcular los valores de baseMean para cada condición
+for (condition in conditions) {
+  baseMean <- rowMeans(normcounts[, coldata$condition == condition]) %>% as.data.frame()
+  colname <- paste0("baseMean_", condition)
+  colnames(baseMean) <- colname
+  baseMeans_list[[colname]] <- baseMean
+}
+
+# Combinar los resultados en un solo data frame
+baseMeans <- do.call(cbind, baseMeans_list)
+
+# Add to every 
+
+res.df <- lapply(res.df, function(df) {
+  combined_df <- cbind(df, baseMeans[rownames(df), ])
+  return(combined_df) })
+
+#Vulcano plots
+
+vplot.df <- 
+
+#Create labels for Vplot
+res.df <- res.df %>% mutate(delabel = ifelse(diffexpressed != "NO", external_gene_name, NA ))
+
+#
+vplot <-  ggplot(data=a, aes(x=res_msex_0_NR_0_NR_1.log2FoldChange, y= -log10(res_msex_0_NR_0_NR_1.padj),  col = res_msex_0_NR_0_NR_1.diffexpressed, label = res_msex_0_NR_0_NR_1.delabel)) +
+  geom_point() +
+  # Add vertical lines for log2FoldChange thresholds, and one horizontal line for the p-value threshold 
+  geom_vline(xintercept=c(0.5, -0.5), col="red") + #log2FoldChange threshold is 0.5
+  geom_hline(yintercept=-log10(0.05), col="red") + #p-value threshold is 0.05
+  scale_color_manual(values=c("#4E8098", "gray", "#A31621")) +
+  theme_minimal() +
+  geom_text_repel() +
+  labs(title = "Differential expression", 
+       subtitle = "Using dichotomic NIA-Reagan Criteria")
+
+b<- res.df[3] %>% as.data.frame()
+
+vplot <-  ggplot(data=b, aes(x=res_NR_1_msex_0_msex_1.log2FoldChange, y= -log10(res_NR_1_msex_0_msex_1.padj),  col = res_NR_1_msex_0_msex_1.diffexpressed, label = res_NR_1_msex_0_msex_1.delabel)) +
+  geom_point() +
+  # Add vertical lines for log2FoldChange thresholds, and one horizontal line for the p-value threshold 
+  geom_vline(xintercept=c(0.5, -0.5), col="red") + #log2FoldChange threshold is 0.5
+  geom_hline(yintercept=-log10(0.05), col="red") + #p-value threshold is 0.05
+  scale_color_manual(values=c("#4E8098", "gray", "#A31621")) +
+  theme_minimal() +
+  geom_text_repel() +
+  labs(title = "Differential expression", 
+       subtitle = "Using dichotomic NIA-Reagan Criteria")
+
+vplot
 
 #Save log2fold change full list --- ---
 
@@ -172,8 +267,6 @@ rownames(DEG_mat)  <- str_remove(rownames(DEG_mat) , "\\..*$")
 DEG_mat <- DEG_mat %>% filter(rownames(DEG_mat) %in% DEGS$ensembl_gene_id)
 dim(DEG_mat)
 #[1] 4130  880
-
-DEG_mat <- D
 
 # Create correlation matrix (distance matrix)
 
