@@ -54,7 +54,6 @@ dim(repeated_rows)
 #Delete rows in the matrix
 
 counts <- counts %>% filter(!feature  %in% repeated_rows$feature)
-dim(counts)
 counts <- bind_rows(counts, repeated_rows)
 dim(counts)
 #[1] 60558  1142
@@ -68,25 +67,23 @@ metadata <- vroom::vroom(file ="/datos/rosmap/data_by_counts/ROSMAP_counts/count
 dim(metadata)
 #[1] 1141   42
 
-table(metadata$dicho_NIA_reagan, useNA = "ifany")
-#  0    1 <NA> 
-#  307  573  261  
+table(metadata$is_AD,  useNA = "ifany")
+# AD  MCI noAD <NA> 
+#   164  103  399  127 
 
 #Filter to have only Samples with dicho_NIA_Reagan metadata
 
 metadata <- metadata %>% filter(!is.na(dicho_NIA_reagan))
+table(metadata$dicho_NIA_reagan, useNA = "ifany")
+#  0    1 <NA> 
+#  307  573  261  
+
 
 counts <- counts %>% dplyr::select(one_of(metadata$specimenID))
 dim(counts)
 #[1] 60558   793
 
 #QC --- ---
-
-# Library sizes
-
-#Library sizes are a technical bias, to be corrected.
-#This plot should look not that variant
-barplot(dge$samples$lib.size)
 
 # Create dge object --- ---
 
@@ -97,16 +94,23 @@ dge <- DGEList(counts, group = group)
 
 drop <- filterByExpr(y = dge, min.count = 10, min.prop = 0.8)
 
-dge <- dge[-drop,]
+dge <- dge[drop,]
 dim(dge)
-#[1] 60557   793
+#[1] 21544   793
+
+# Library sizes
+
+#Library sizes are a technical bias, to be corrected.
+#This plot should look not that variant
+barplot(dge$samples$lib.size)
 
 #Normalize the data using the TMM scaling factor method.
 
-dge <- calcNormFactors(dge)
+dge <- calcNormFactors(dge, 
+                       method = "TMM")
 
 # MDS plot
-plotMDS(dge, labels = group, col = as.numeric(group))
+mds <- plotMDS(dge, labels = group, col = as.numeric(group))
 
 # Boxplot de valores de cuentas normalizadas
 logCPM <- cpm(dge, log = TRUE)
@@ -115,14 +119,12 @@ boxplot(logCPM, las = 2, col = as.numeric(group))
 # Model Matrix 
 
 design <- model.matrix(~0 + group)
-colnames(design) <- levels(group)
+colnames(design) <- c("dicho_NIA_Reagan_0", "dicho_NIA_Reagan_1")
+rownames(design) <- metadata$specimenID
 y <- estimateDisp(dge, design)
 
 # Differential expression 
-colnames(design) <- c("dicho_NIA_Reagan_0", "dicho_NIA_Reagan_1")
-rownames(design) <- metadata$specimenID
-group1 <- "0"
-group2 <- "1"
+
 #voom for transformation and linear modeling
 v <- voom(y, design, plot = TRUE)
 fit <- lmFit(v, design)
@@ -131,22 +133,54 @@ cont.matrix <- makeContrasts('dicho_NIA_Reagan_0 - dicho_NIA_Reagan_1', levels =
 fit <- contrasts.fit(fit, cont.matrix )
 fit <- eBayes(fit)
 results <- topTable(fit, number = Inf, adjust.method = "BH")
+results$feature <- rownames(results)
+
+#Extract DEGs
+
+# add a column of NAs
+results$diffexpressed <- "NO"
+# if log2Foldchange > 0.5 and pvalue < 0.05, set as "UP" 
+results$diffexpressed[results$logFC > 0.5 & results$adj.P.Val < 0.05] <- "UP"
+# if log2Foldchange < -0.5 and pvalue < 0.05, set as "DOWN"
+results$diffexpressed[results$logFC < -0.5 & results$adj.P.Val < 0.05] <- "DOWN"
+
+#
+DEGS <- results %>% filter(diffexpressed != "NO")
+rownames(DEGS) <- DEGS$ensembl_gene_id
+dim(DEGS)
+#[1] 58  7
 
 #Vulcano plot --- ---
 
 volc <- EnhancedVolcano(results,
-                lab = rownames(results),
-                x = 'logFC',
-                y = 'P.Value')
+                        lab = rownames(results),
+                        x = 'logFC',
+                        y = 'adj.P.Val',
+                        pCutoff = 0.05,
+                        FCcutoff = 1.0,
+                        title = 'Volcano plot',
+                        subtitle = 'Differential Expression Analysis')
 
 #Heatmap --- ---
 
-pheatmap(
-  results,
-  color = colorRampPalette(c("blue", "white", "red"))(100),  # Esquema de color (aquí azul-blanco-rojo)
-  clustering_method = "complete",  # Método de agrupamiento jerárquico completo
-  scale = "row",  # Escalar por filas (genes)
-  show_rownames = TRUE,  # Mostrar nombres de filas (genes)
-  show_colnames = TRUE,  # Mostrar nombres de columnas (condiciones/grupos)
-  main = "Heatmap de Expresión Diferencial"  # Título del heatmap
-)
+#Extraer DEGS y hacer heatmap solo con eso 
+normcounts_DEG <- as.data.frame(logCPM) %>% filter(rownames(logCPM) %in% DEGS$feature)
+
+metadata_DEG <-  data.frame(
+  dicho_NIA_reagan = as.factor(metadata$dicho_NIA_reagan),  # Replace with your actual metadata
+  row.names = colnames(counts_DEG)  # Ensure row names match column names of counts_DEG
+) %>% arrange(dicho_NIA_reagan)
+
+#Order
+
+normcounts_DEG <- normcounts_DEG[, rownames(metadata_DEG)]
+
+# Create the heatmap
+pheatmap(normcounts_DEG,
+         cluster_rows = F,   # Cluster the rows
+         cluster_cols = F,   # Do not cluster the columns
+         main = "Heatmap of Differentially Expressed Genes", 
+         annotation_col = metadata_DEG
+         )
+
+#END
