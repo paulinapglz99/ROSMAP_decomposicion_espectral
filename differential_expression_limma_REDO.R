@@ -140,9 +140,9 @@ results$feature <- rownames(results)
 # add a column of NAs
 results$diffexpressed <- "NO"
 # if log2Foldchange > 0.5 and pvalue < 0.05, set as "UP" 
-results$diffexpressed[results$logFC > 0.5 & results$adj.P.Val < 0.05] <- "UP"
+results$diffexpressed[results$logFC > 0.75 & results$adj.P.Val < 0.05] <- "UP"
 # if log2Foldchange < -0.5 and pvalue < 0.05, set as "DOWN"
-results$diffexpressed[results$logFC < -0.5 & results$adj.P.Val < 0.05] <- "DOWN"
+results$diffexpressed[results$logFC < -0.75 & results$adj.P.Val < 0.05] <- "DOWN"
 
 #
 DEGS <- results %>% filter(diffexpressed != "NO")
@@ -177,10 +177,11 @@ normcounts_DEG <- normcounts_DEG[, rownames(metadata_DEG)]
 
 # Create the heatmap
 pheatmap(normcounts_DEG,
-         cluster_rows = F,   # Cluster the rows
-         cluster_cols = F,   # Do not cluster the columns
+         cluster_rows = T,   # Cluster the rows
+         cluster_cols = T,   # Do not cluster the columns
          main = "Heatmap of Differentially Expressed Genes", 
-         annotation_col = metadata_DEG
+         annotation_col = metadata_DEG,
+         show_colnames = FALSE  # Hide the column names (sample names)
          )
 
 #END
