@@ -5,26 +5,36 @@
 
 #libraries  ----- 
 
-pacman::p_load("dplyr", 
-               "ggplot2", 
-               "gridExtra", 
-               "ggcorrplot")
+pacman::p_load("dplyr")
+
+#Functions --- ---
+ 
+# Function to filter and summarize data by brain region
+
+summarize_by_tissue <- function(metadata, tissue_name) {
+  tissue_data <- metadata %>% filter(tissue == tissue_name)
+  cat(paste0("Metadata dim ", tissue_name, ": "), dim(tissue_data), "\n")
+  cat("NIA-Reagan diagnosis table:\n")
+  print(table(tissue_data$dicho_NIA_reagan, useNA = "ifany"))
+  return(tissue_data)
+}
+
+##################################### ROSMAP ##################################### 
 
 #Read metadata --- ---
 
 #This data was directly downloaded from https://www.synapse.org/#!Synapse:syn27000096
 
-metadata <- vroom::vroom(file = '/datos/rosmap/data_by_counts/metadata/RNAseq_Harmonization_ROSMAP_combined_metadata.csv')
-dim(metadata)
+metadata_ROSMAP <- vroom::vroom(file = '/datos/rosmap/data_by_counts/metadata/RNAseq_Harmonization_ROSMAP_combined_metadata.csv')
+dim(metadata_ROSMAP)
 #[1] 3400   38
 
-#Merge metadata in one dataset
 #Add other dx variants to metadata
 
 #NIA reagan was constructed as https://www.sciencedirect.com/science/article/pii/S0197458097000572?via%3Dihub 2.B.Neuropathological Assessment
 #and https://www.radc.rush.edu/docs/var/detail.htm?category=Pathology&subcategory=Alzheimer%27s+disease&variable=adnc
 
-metadata <- metadata %>%
+metadata_ROSMAP <- metadata_ROSMAP %>%
   filter(assay == "rnaSeq") %>%  
   mutate(NIA_reagan_ADLikelihood = case_when(         
        (ceradsc == 1 & (braaksc == 5 | braaksc ==  6)) ~ "3", #High likelihood
@@ -47,89 +57,65 @@ metadata <- metadata %>%
     cogdx %in% c(2, 3) ~ "MCI",
     TRUE ~ NA_character_
   ))
-dim(metadata)
+dim(metadata_ROSMAP)
 #[1] 2809   42
-
-table(metadata$is_AD, useNA = "ifany")
-#   AD  MCI noAD <NA> 
-#   536  484 1308  481 
- 
-table(metadata$dicho_NIA_reagan, useNA = "ifany")
-#     0    1 <NA> 
-#   775 1185  849 
 
 #Define metadata by brain region --- ---
 
-#Metadata for frontal cortex (FC)
-metadata_FC <- metadata %>% filter(tissue == "frontal cortex")
-dim(metadata_FC)
-#[1] 123  41
-table(metadata_FC$is_AD, useNA = "ifany")
-# AD  MCI noAD <NA> 
-#   20   21   67   15 
+tissues_ROSMAP <- unique(metadata_ROSMAP$tissue)
+#[1] "frontal cortex"                 "temporal cortex"                "dorsolateral prefrontal cortex" "Head of caudate nucleus"       
+#[5] "posterior cingulate cortex"    
 
-#Metadata for temporal cortex (TC)
-metadata_TC <- metadata %>% filter(tissue == "temporal cortex")
-dim(metadata_TC)
-#[1] 125  41
-table(metadata_TC$is_AD, useNA = "ifany")
-# AD  MCI noAD <NA> 
-#   22   21   67   15 
-
-#Metadata Dorsoral Prefrontal Cortex (DLPFC)
-metadata_DLPFC<- metadata %>% filter(tissue == "dorsolateral prefrontal cortex")
-dim(metadata_DLPFC)
-#[1] 1141   41
-table(metadata_DLPFC$is_AD, useNA = "ifany")
-# AD  MCI noAD <NA> 
-#   231  194  506  210 
-table(metadata_DLPFC$dicho_NIA_reagan, useNA = "ifany")
-# 0    1 <NA> 
+metadata_tissue_ROSMAP <- lapply(tissues_ROSMAP, 
+                                 function(tissue) summarize_by_tissue(metadata_ROSMAP, tissue))
+# 
+# Metadata dim frontal cortex:  123 42 
+# NIA-Reagan diagnosis table:
+#   
+#   0    1 <NA> 
+#   33   49   41 
+# Metadata dim temporal cortex:  125 42 
+# NIA-Reagan diagnosis table:
+#   
+#   0    1 <NA> 
+#   33   51   41 
+# Metadata dim dorsolateral prefrontal cortex:  1141 42 
+# NIA-Reagan diagnosis table:
+#   
+#   0    1 <NA> 
 #   307  486  348 
-
-#Metadata for Head of caudate nucleus (HCN)
-metadata_HCN <- metadata %>% filter(tissue == "Head of caudate nucleus")
-dim(metadata_HCN)
-#[1] 749  41
-table(metadata_HCN$is_AD, useNA = "ifany")
-# AD  MCI noAD <NA> 
-#   142  141  343  123 
-table(metadata_HCN$dicho_NIA_reagan, useNA = "ifany")
-# 0    1 <NA> 
+# Metadata dim Head of caudate nucleus:  749 42 
+# NIA-Reagan diagnosis table:
+#   
+#   0    1 <NA> 
 #   206  327  216 
-
-#Metadata for posterior cingulate cortex (PCC)
-metadata_PCC <- metadata %>% filter(tissue == "posterior cingulate cortex")
-dim(metadata_PCC)
-#[1] 671  41
-table(metadata_PCC$is_AD, useNA = "ifany")
-# AD  MCI noAD 
-# 121  107  325 
-table(metadata_PCC$dicho_NIA_reagan, useNA = "ifany")
-# 0    1 <NA> 
+# Metadata dim posterior cingulate cortex:  671 42 
+# NIA-Reagan diagnosis table:
+#   
+#   0    1 <NA> 
 #   196  272  203 
 
 #Save metadata --- --- 
 
 #Metadata for frontal cortex (FC)
 # 
-# vroom::vroom_write(metadata_FC, file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/FC/RNA_seq_metadata_FC.txt")
+#vroom::vroom_write(metadata_tissue_ROSMAP[[1]], file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/FC/RNA_seq_metadata_FC.txt")
 # 
 # #Metadata for temporal cortex (TC)
 # 
-# vroom::vroom_write(metadata_TC, file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/TC/RNA_seq_metadata_TC.txt")
+# vroom::vroom_write(metadata_tissue_ROSMAP[[2]], file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/TC/RNA_seq_metadata_TC.txt")
 # 
 # #Metadata Dorsoral Prefrontal Cortex (DLPFC)
 # 
-# vroom::vroom_write(metadata_DLPFC, file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/DLPFC/RNA_seq_metadata_DLPFC.txt")
+# vroom::vroom_write(metadata_tissue_ROSMAP[[3]], file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/DLPFC/RNA_seq_metadata_DLPFC.txt")
 # 
 # #Metadata for Head of caudate nucleus (HCN)
 # 
-# vroom::vroom_write(metadata_HCN, file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/HCN//RNA_seq_metadata_HCN.txt")
+# vroom::vroom_write(metadata_tissue_ROSMAP[[4]], file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/HCN/RNA_seq_metadata_HCN.txt")
 # 
 # #Metadata for posterior cingulate cortex (PCC)
 # 
-# vroom::vroom_write(metadata_PCC, file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/PCC/RNA_seq_metadata_PCC.txt")
+# vroom::vroom_write(metadata_tissue_ROSMAP[[5]], file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/PCC/RNA_seq_metadata_PCC.txt")
 # 
 #Read expression data, there's 4 count archives --- ---
 
@@ -150,32 +136,32 @@ dim(counts)
 
 #Counts from the frontal cortex
 
-counts_FC <- counts[, (colnames(counts) %in% metadata_FC$specimenID)] %>% mutate(features = counts[1], .before = 1)
+counts_FC <- counts[, (colnames(counts) %in% metadata_tissue_ROSMAP[[1]]$specimenID)] %>% mutate(features = counts[1], .before = 1)
 dim(counts_FC)
 #[1] 60607     124
 
 #Counts from the temporal cortex
 
-counts_TC <- counts[, (colnames(counts) %in% metadata_TC$specimenID)] %>% mutate(counts[1], .before = 1)
+counts_TC <- counts[, (colnames(counts) %in% metadata_tissue_ROSMAP[[2]]$specimenID)] %>% mutate(counts[1], .before = 1)
 dim(counts_TC)
 #[1] 60607     126
 
 #Counts for Dorsoral Prefrontal Cortex
-counts_DLPFC <- counts[, (colnames(counts) %in% unique(metadata_DLPFC$specimenID))] %>% mutate(counts[1], .before = 1)
+counts_DLPFC <- counts[, (colnames(counts) %in% unique(metadata_tissue_ROSMAP[[3]]$specimenID))] %>% mutate(counts[1], .before = 1)
 dim(counts_DLPFC)
 #[1] 60607   1142
 
 #Counts for  Head of caudate nucleus 
-counts_HCN <- counts[, (colnames(counts) %in% unique(metadata_HCN$specimenID))] %>% mutate(counts[1], .before = 1)
+counts_HCN <- counts[, (colnames(counts) %in% unique(metadata_tissue_ROSMAP[[4]]$specimenID))] %>% mutate(counts[1], .before = 1)
 dim(counts_HCN)
 #[1] 60607   750
 
 #Counts for posterior cingulate cortex
-counts_PCC <- counts[, c(colnames(counts) %in% metadata_PCC$specimenID)] %>% mutate(counts[1], .before = 1)
+counts_PCC <- counts[, c(colnames(counts) %in% metadata_tissue_ROSMAP[[5]]$specimenID)] %>% mutate(counts[1], .before = 1)
 dim(counts_PCC)
 #[1] 60607   672
 
-#Save count data ---- ---
+#Save count data for ROSMAP ---- ---
 
 #Counts for Dorsoral Prefrontal Cortex
 # 
@@ -197,258 +183,150 @@ dim(counts_PCC)
 # 
 # vroom::vroom_write(counts_TC, file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/TC/ROSMAP_RNAseq_rawcounts_TC.txt")
 
-#PLOTTING METRICS --- ---
+##################################### MSBB ##################################### 
 
-#Mapping counts
+metadata_MSBB <- vroom::vroom(file = "/datos/rosmap/data_by_counts/metadata/RNAseq_Harmonization_MSBB_combined_metadata.csv")
 
-mapping_counts <- data.frame(
-  Region = c("DLPFC", "HCN", "PCC", "TC", "FC"),
-  samples = c(dim(counts_DLPFC)[2], dim(counts_HCN)[2], dim(counts_PCC)[2], dim(counts_TC)[2], dim(counts_FC)[2]), 
-  features = c(dim(counts_DLPFC)[1], dim(counts_HCN)[1], dim(counts_PCC)[1], dim(counts_TC)[1], dim(counts_FC)[1])
-) %>%
-  mutate(percentage = samples / sum(samples) * 100)
-N <- sum(mapping_counts$samples)
+#Filter MSSB metadata 
+#Based on CDR classification, subjects are grouped as no cognitive deficits (CDR = 0),
+#questionable dementia (CDR = 0.5), mild dementia (CDR = 1.0), moderate dementia (CDR = 2.0), and severe to terminal dementia (CDR = 3.0–5.0). 
 
-#Plot
-
-mapping_counts.p <- ggplot(mapping_counts, aes(x = Region, y = samples, fill = Region)) +
-  geom_bar(stat = "identity") +
-  geom_text(aes(label = samples), vjust = -0.5, size = 3.5) + # Añadir números encima de las barras
-  labs(
-    title = "Number of specimens sequenced",
-    x = "Brain region",
-    y = "SpecimenID sequenced") +
-  annotate("text", x = Inf, y = Inf, label = paste("Total features = 60,607"), hjust = 1, vjust = 1, size = 4) +
-  scale_fill_brewer(palette="Set1") +  
-  theme_minimal()
-
-mapping_counts_pie.p <- ggplot(mapping_counts, aes(x = "", y = percentage, fill = Region)) +
-  geom_bar(stat = "identity", width = 1, color = "white") +  # Añadir color blanco a los bordes para que no haya gaps
-  coord_polar("y", start = 0) +
-  geom_label(aes(label = paste0(round(percentage, 1), "%")), position = position_stack(vjust = 0.5), show.legend = FALSE) +  # Usar geom_label para etiquetas en cajas
-  labs(
-    title = " ",
-    subtitle = " ",
-    x = "",
-    y = ""
-  ) +
-  theme_minimal() +
-  scale_fill_brewer(palette = "Set1") 
-
-#Vis
-
-mapping_counts_pie.p
-
-ggsave(filename = "mapping_counts_pie.png", 
-       device = "png", 
-       plot = mapping_counts_pie.p, dpi = 300, width = 10, height = 8)
-
-
-#Distribution of sex
-
-#For AD
-
-AD_sex <- ggplot(AD_metadata, aes(x = as.factor(msex), fill = as.factor(msex))) +
-         geom_bar() +
-         geom_text(stat='count', aes(label=..count..), vjust=-0.5) +  
-           labs(
-         title = "For AD pathology patients",
-         x = "Sex",
-         y = "Count",
-         fill = "Sex") + 
-  annotate("text", x = Inf, y = Inf, label = paste("Total N =", N_AD), hjust = 1, vjust = 1, size = 4) +  # Agregar el total en una esquina
-  scale_fill_brewer(palette="Set1") +
-  theme_minimal()
-
-#Vis
-
-AD_sex
-
-#For no AD
-
-no_ADsex <-  ggplot(noAD_metadata, aes(x = as.factor(msex), fill = as.factor(msex))) +
-  geom_bar() +
-  geom_text(stat='count', aes(label=..count..), vjust=-0.5) +  
-  labs(title = "For no AD pathology patients",
-    x = "Sex",
-    y = "Count", 
-    fill = "Sex") +
-  annotate("text", x = Inf, y = Inf, label = paste("Total N =", N_noAD), hjust = 1, vjust = 1, size = 4) +  # Agregar el total en una esquina
-  scale_fill_brewer(palette="Set1") +  
-  theme_minimal()
-
-#Vis
-
-no_ADsex
-
-#Grid both graphs
-
-sex_grid <- grid.arrange(AD_sex, no_ADsex, ncol = 2)
-
-#Vis
-
-sex_grid
-
-#Distribution of education
-
-AD_educ <- ggplot(AD_metadata, aes(x = as.factor(educ), fill = as.factor(educ))) +
-  geom_bar() +
-  geom_text(stat='count', aes(label=..count..), vjust=-0.5) +  
-  annotate("text", x = Inf, y = Inf, label = paste("Total N =", N_AD), hjust = 1, vjust = 1, size = 4) +  # Agregar el total en una esquina
-  theme(legend.position = "none") +
-  labs(
-    title = "For AD pathology patients",
-    x = "Years of education",
-    y = "Count"
-  ) +  
-  annotate("text", x = Inf, y = Inf, label = paste("Total N =", N_AD), hjust = 1, vjust = 1, size = 4) +  # Agregar el total en una esquina
-  theme_minimal()
+metadata_MSBB <- metadata_MSBB %>%
+  filter(assay == "rnaSeq") %>%  
+  mutate(NIA_reagan_ADLikelihood = case_when(         
+    (CERAD == 1 & (Braak == 5 | Braak ==  6)) ~ "3", #High likelihood
+    (CERAD == 2 & (Braak == 3 | Braak == 4)) ~ "2", #Intermediate likelihood
+    (CERAD == 3 & (Braak == 1 | Braak == 2)) ~ "1", #Low likelihood
+    CERAD == 4 ~ "0",  #No AD (0)
+    TRUE ~ NA_character_  # Handle no-specified cases
+  )) %>% 
+  mutate(dicho_NIA_reagan = case_when(
+    (NIA_reagan_ADLikelihood == 0 | NIA_reagan_ADLikelihood == 1) ~ "0", #no AD pathology
+    (NIA_reagan_ADLikelihood == 2 | NIA_reagan_ADLikelihood == 3) ~ "1"  #AD pathology
+  )) %>% 
+  mutate(is_resilient = case_when(
+    CDR %in% c(3.0, 4.0, 5.0) & (Braak != 0 & (CERAD == 1 | CERAD ==2)) ~ "resilient", 
+    TRUE ~ NA_character_ 
+  )) %>% 
+  mutate(is_AD = case_when(
+    CDR == 0 | CERAD == 4 ~ "noAD",
+    (CDR %in% c(3.0, 4.0, 5.0) & CERAD == 1) ~ "AD",
+    CDR %in% c(1.0, 2.0) ~ "MCI",
+    TRUE ~ NA_character_
+  ))
   
-#For noAD
+table(metadata_MSBB$dicho_NIA_reagan, useNA = "ifany")
 
-noAD_educ <-  ggplot(noAD_metadata, aes(x = as.factor(educ), fill = as.factor(educ))) +
-  geom_bar() +
-  geom_text(stat='count', aes(label=..count..), vjust=-0.5) + 
-  annotate("text", x = Inf, y = Inf, label = paste("Total N =", N_noAD), hjust = 1, vjust = 1, size = 4) +  # Agregar el total en una esquina
-  theme(legend.position = "none") +
-  labs(
-    title = "For no AD pathology patients",
-    x = "Years of education",
-    y = "Count"
-  ) +
-  annotate("text", x = Inf, y = Inf, label = paste("Total N =", N_noAD), hjust = 1, vjust = 1, size = 4) +  # Agregar el total en una esquina
-  theme_minimal()
+#Define metadata by brain region --- ---
 
-grid.arrange(AD_educ, noAD_educ, ncol = 2)
+tissues_MSBB <- unique(metadata_MSBB$tissue)
 
-#Race 
+metadata_tissue_MSBB <- lapply(tissues_MSBB, function(tissues_MSBB) summarize_by_tissue(metadata_MSBB, tissues_MSBB))
 
-#For AD
+# Metadata dim superior temporal gyrus:  334 36 
+# NIA-Reagan diagnosis table:
+#   
+#   0    1 <NA> 
+#   49   20  265 
+# Metadata dim parahippocampal gyrus:  315 36 
+# NIA-Reagan diagnosis table:
+#   
+#   0    1 <NA> 
+#   43   16  256 
+# Metadata dim frontal pole:  310 36 
+# NIA-Reagan diagnosis table:
+#   
+#   0    1 <NA> 
+#   47   19  244 
+# Metadata dim inferior frontal gyrus:  308 36 
+# NIA-Reagan diagnosis table:
+#   
+#   0    1 <NA> 
+#   45   19  244 
+# Metadata dim prefrontal cortex:  15 36 
+# NIA-Reagan diagnosis table:
+#   
+#   1 <NA> 
+#   2   13 
 
-AD_race <- ggplot(AD_metadata, aes(x = as.factor(race), fill = as.factor(race))) +
-  geom_bar() +
-  geom_text(stat='count', aes(label=..count..), vjust=-0.5) +  
-  annotate("text", x = Inf, y = Inf, label = paste("Total N =", N_AD), hjust = 1, vjust = 1, size = 4) +  # Agregar el total en una esquina
-  theme(legend.position = "none") +
-  labs(
-    title = "For AD pathology patients",
-    x = "Race",
-    y = "Count") +
-  scale_fill_brewer(palette="Set1") +  
-  theme_minimal() +
-  scale_x_discrete(labels = c("White", "African American", "American Indian or Alaska Native"))
+#Read expression data --- --- 
 
-#For no AD
+counts_MSSB <-  vroom::vroom(file = "/datos/rosmap/data_by_counts/MSBB_counts/MSBB_gene_all_counts_matrix_clean.txt")
 
-noAD_race <-  ggplot(noAD_metadata, aes(x = as.factor(race), fill = as.factor(race))) +
-  geom_bar() +
-  geom_text(stat='count', aes(label=..count..), vjust=-0.5) + 
-  annotate("text", x = Inf, y = Inf, label = paste("Total N =", N_noAD), hjust = 1, vjust = 1, size = 4) +  # Agregar el total en una esquina
-  theme(legend.position = "none") +
-  labs(
-    title = "For no AD pathology patients",
-    x = "Years of education",
-    y = "Count"
-  ) + 
-  scale_fill_brewer(palette="Set1") +  
-  theme_minimal() +
-  scale_x_discrete(labels = c("White", "African American", "American Indian or Alaska Native"))
+#Stratify data by brain region --- --- 
 
+#Counts "superior temporal gyrus" (STG)
+counts_STG_MSBB <- counts_MSSB[, (colnames(counts_MSSB) %in% metadata_tissue_MSBB[[1]]$specimenID)] %>% mutate(features = counts_MSSB[1], .before = 1)
+dim(counts_STG_MSBB)
 
-grid.arrange(AD_race, noAD_race, ncol = 2)
+#Counts from parahippocampal gyrus (PHCG)
 
-#Tissue 
+counts_PHCG_MSBB <- counts_MSSB[, (colnames(counts_MSSB) %in% metadata_tissue_MSBB[[2]]$specimenID)] %>% mutate(counts_MSSB[1], .before = 1)
+dim(counts_PHFG_MSBB)
 
-AD_tissue <- ggplot(AD_metadata, aes(x = as.factor(tissue), fill = as.factor(tissue))) +
-  geom_bar() +
-  geom_text(stat='count', aes(label=..count..), vjust=-0.5) +  
-  labs(
-    title = "For AD pathology patients",
-    x = "Tissue",
-    y = "Count", 
-    fill = "Tissue") +
-  scale_fill_brewer(palette="Set1") +  
-  theme_minimal()
+#Counts for frontal pole (FP)
+counts_FP_MSBB <- counts_MSSB[, (colnames(counts_MSSB) %in% unique(metadata_tissue_MSBB[[3]]$specimenID))] %>% mutate(counts_MSSB[1], .before = 1)
+dim(counts_FP_MSBB)
 
-noAD_tissue <- ggplot(noAD_metadata, aes(x = as.factor(tissue), fill = as.factor(tissue))) +
-  geom_bar() +
-  geom_text(stat='count', aes(label=..count..), vjust=-0.5) +  
-  labs(
-    title = "For AD pathology patients",
-    x = "Tissue",
-    y = "Count", 
-    fill = "Tissue") +
-  scale_fill_brewer(palette="Set1") +  
-  theme_minimal()
+#Counts for inferior frontal gyrus (IFG)
+counts_IFG_MSBB <- counts_MSSB[, (colnames(counts_MSSB) %in% unique(metadata_tissue_MSBB[[4]]$specimenID))] %>% mutate(counts_MSSB[1], .before = 1)
+dim(counts_IFG_MSBB)
 
-grid.arrange(AD_tissue, noAD_tissue, ncol = 1)
+#Counts for prefrontal cortex (PFC)
+counts_PFC_MSBB <- counts_MSSB[, c(colnames(counts_MSSB) %in% metadata_tissue_MSBB[[5]]$specimenID)] %>% mutate(counts_MSSB[1], .before = 1)
+dim(counts_PCC_MSBB)
 
-#Distribution of Age of death
+#Save count data for MSBB ---- ---
 
-metadata_ind$age_death <- gsub("90\\+", "90", metadata_ind$age_death)
+# Counts "superior temporal gyrus"
+ 
+vroom::vroom_write(counts_STG_MSBB, file = "/datos/rosmap/data_by_counts/MSBB_counts/counts_by_tissue/STG/MSBB_RNAseq_rawcounts_STG.txt")
+ 
+# #Counts for parahippocampal gyrus (PHCG)
+ 
+vroom::vroom_write(counts_PHFG_MSBB, file = "/datos/rosmap/data_by_counts/MSBB_counts/counts_by_tissue/PHCG/MSBB_RNAseq_rawcounts_PHCG.txt")
+ 
+# #Counts for frontal pole (FP)
 
-ade_death <- ggplot(metadata_ind, aes(x = dicho_NIA_reagan, y = as.numeric(age_death), fill = dicho_NIA_reagan)) +
-  geom_violin() +
-  theme_minimal() +
-  labs(title = "Age of death",
-    x = "Dichotomized NIA Reagan",
-    y = "Age of death") +
-  scale_fill_brewer(palette="Set1") +  
-  theme_minimal()
-  
-#APOE genotype
+vroom::vroom_write(counts_PCC, file = "/datos/rosmap/data_by_counts/MSBB_counts/counts_by_tissue/PHCG/MSBB_RNAseq_rawcounts_PHCG.txt")
+ 
+# #Counts for Frontal Cortex
+ 
+vroom::vroom_write(counts_FC, file = "/datos/rosmap/data_by_counts/MSBB_counts/counts_by_tissue/PHCG/MSBB_RNAseq_rawcounts_PHCG.txt")
+ 
+# #Counts for Temporal cortex
 
-AD_APOE <- ggplot(AD_metadata, aes(x = as.factor(apoe_genotype), fill = as.factor(apoe_genotype))) +
-  geom_bar() +
-  geom_text(stat='count', aes(label=..count..), vjust=-0.5) +  
-  annotate("text", x = Inf, y = Inf, label = paste("Total N =", N_AD), hjust = 1, vjust = 1, size = 4) +  # Agregar el total en una esquina
-    labs(
-    title = "For AD pathology patients",
-    x = "APOE genotype",
-    y = "Count") +
-    scale_fill_brewer(palette="Set1") +  
-    theme_minimal()
+vroom::vroom_write(counts_TC, file = "/datos/rosmap/data_by_counts/MSBB_counts/counts_by_tissue/PHCG/MSBB_RNAseq_rawcounts_PHCG.txt")
 
-noAD_APOE <-  ggplot(noAD_metadata, aes(x = as.factor(apoe_genotype), fill = as.factor(apoe_genotype))) +
-  geom_bar() +
-  geom_text(stat='count', aes(label=..count..), vjust=-0.5) +
-  annotate("text", x = Inf, y = Inf, label = paste("Total N =", N_noAD), hjust = 1, vjust = 1, size = 4) +  # Agregar el total en una esquina
-    labs(
-    title = "For no AD pathology patients",
-    x = "APOE genotype",
-    y = "Count") +
-  scale_fill_brewer(palette="Set1") +  
-  theme_minimal()
+##################################### Mayo Clinic ##################################### 
 
-grid.arrange(AD_APOE, noAD_APOE, ncol = 1)
+metadata_Mayo <- vroom::vroom(file = "/datos/rosmap/data_by_counts/metadata/RNAseq_Harmonization_Mayo_combined_metadata.csv")
 
-#Distribution of post-mortem interval
+tissues_Mayo <- unique(metadata_Mayo$tissue)
 
-PMI_interval <- ggplot(metadata_ind, aes(x = dicho_NIA_reagan, y = as.numeric(pmi), fill = dicho_NIA_reagan)) +
-  geom_boxplot() +
-  theme_minimal() +
-  labs(
-    title = "Post mortem Inverval",
-    x = "Dichotomized NIA Reagan",
-    y = "Post mortem inverval"
-  ) +
-  scale_fill_brewer(palette="Set1") +  
-  theme_minimal()
+metadata_tissue_Mayo <- lapply(tissues_Mayo, function(tissues_Mayo) summarize_by_tissue(metadata_Mayo, tissues_Mayo))
 
-#RIN
+#Get expression data --- ---
 
-RIN <- ggplot(metadata_ind, aes(x = dicho_NIA_reagan, y = as.numeric(RIN), fill = dicho_NIA_reagan)) +
-  geom_boxplot() +
-  theme_minimal() +
-  labs(
-    title = "RIN",
-    x = "Dichotomized NIA Reagan",
-    y = "RIN" 
-  ) + 
-  scale_fill_brewer(palette="Set1") +  
-  theme_minimal()
+counts_Mayo <-  vroom::vroom(file = "/datos/rosmap/data_by_counts/Mayo_counts/Mayo_gene_all_counts_matrix_clean.txt")
 
+#Stratify by brain region --- ---
 
-RIN
+#counts for cerebellum
+counts_CRB_Mayo <- counts_Mayo[, (colnames(counts_Mayo) %in% metadata_tissue_Mayo[[1]]$specimenID)] %>% mutate(features = counts_Mayo[1], .before = 1)
+dim(counts_CRB_Mayo)
 
-#END
+#Counts from Temporal cortex
+
+counts_TC_Mayo <- counts_Mayo[, (colnames(counts_Mayo) %in% metadata_tissue_Mayo[[2]]$specimenID)] %>% mutate(counts_Mayo[1], .before = 1)
+dim(counts_TC_Mayo)
+
+#Save count data for MSBB ---- ---
+
+# Counts for cerebellum
+
+vroom::vroom_write(counts_CRB_Mayo, file = "/datos/rosmap/data_by_counts/Mayo_counts/counts_by_tissue/cerebellum/Mayo_RNAseq_rawcounts_CRB.txt")
+
+# #Counts for Temporal cortex
+
+vroom::vroom_write(counts_TC_Mayo, file = "/datos/rosmap/data_by_counts/Mayo_counts/counts_by_tissue/TC/Mayo_RNAseq_rawcounts_TC.txt")

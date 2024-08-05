@@ -7,6 +7,7 @@
 # BiocManager::install("Glimma")
 # BiocManager::install("edgeR")
 # BiocManager::install("EnhancedVolcano")
+# BiocManager::install("sva")
 
 pacman::p_load("tidyverse",
                "limma",
@@ -15,13 +16,25 @@ pacman::p_load("tidyverse",
                "stringr", 
                "pheatmap",
                "edgeR",
-               "EnhancedVolcano")
+               "EnhancedVolcano", 
+               "sva")
 
 #Get data --- ---
+
+#Get counts
 
 counts <- vroom::vroom(file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/full_counts/ROSMAP_RNAseq_rawcounts_DLPFC.txt") %>% as.data.frame()
 counts <- counts[ -c(1:4),] #Delete alignment stats
 counts$feature <- str_remove(counts$feature, "\\..*$")
+
+# Get metadata
+metadata <- vroom::vroom(file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/DLPFC/RNA_seq_metadata_DLPFC.txt")
+dim(metadata)
+#[1] 1141   42
+
+table(metadata$cogdx,  useNA = "ifany")
+# AD  MCI noAD <NA> 
+#   164  103  399  127 
 
 # Combine and summarize duplicate features, then replace the original rows
 # counts <- counts %>%
@@ -62,22 +75,9 @@ rownames(counts) <- counts$feature
 #  Convert selected columns to integers
 counts <- counts %>% mutate(across(-feature, as.integer))
 
-# Get metadata
-metadata <- vroom::vroom(file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/DLPFC/RNA_seq_metadata_DLPFC.txt")
-dim(metadata)
-#[1] 1141   42
-
-table(metadata$is_AD,  useNA = "ifany")
-# AD  MCI noAD <NA> 
-#   164  103  399  127 
-
 #Filter to have only Samples with dicho_NIA_Reagan metadata
 
-metadata <- metadata %>% filter(!is.na(dicho_NIA_reagan))
-table(metadata$dicho_NIA_reagan, useNA = "ifany")
-#  0    1 <NA> 
-#  307  573  261  
-
+metadata <- metadata %>% filter(!is.na(cogdx))
 
 counts <- counts %>% dplyr::select(one_of(metadata$specimenID))
 dim(counts)
@@ -85,9 +85,13 @@ dim(counts)
 
 #QC --- ---
 
+#Combat-seq to omit batch
+
+counts <- ComBat_seq(counts = as.matrix(counts), batch = metadata$sequencingBatch)
+
 # Create dge object --- ---
 
-group <- factor(metadata$dicho_NIA_reagan) # Ajusta esto según tu metadata
+group <- factor(metadata$cogdx) # Ajusta esto según tu metadata
 dge <- DGEList(counts, group = group)
 
 #Filter data on lower count rate 
@@ -106,8 +110,7 @@ barplot(dge$samples$lib.size)
 
 #Normalize the data using the TMM scaling factor method.
 
-dge <- calcNormFactors(dge, 
-                       method = "TMM")
+dge <- calcNormFactors(dge, method = "TMM")
 
 # MDS plot
 mds <- plotMDS(dge, labels = group, col = as.numeric(group))
@@ -119,7 +122,7 @@ boxplot(logCPM, las = 2, col = as.numeric(group))
 # Model Matrix 
 
 design <- model.matrix(~0 + group)
-colnames(design) <- c("dicho_NIA_Reagan_0", "dicho_NIA_Reagan_1")
+#colnames(design) <- c("dicho_NIA_Reagan_0", "dicho_NIA_Reagan_1")
 rownames(design) <- metadata$specimenID
 y <- estimateDisp(dge, design)
 
@@ -129,7 +132,7 @@ y <- estimateDisp(dge, design)
 v <- voom(y, design, plot = TRUE)
 fit <- lmFit(v, design)
 #Use makeContrasts to define the contrasts you want to test
-cont.matrix <- makeContrasts('dicho_NIA_Reagan_0 - dicho_NIA_Reagan_1', levels = design)
+cont.matrix <- makeContrasts('group1 - group4', levels = design)
 fit <- contrasts.fit(fit, cont.matrix )
 fit <- eBayes(fit)
 results <- topTable(fit, number = Inf, adjust.method = "BH")
@@ -157,7 +160,7 @@ volc <- EnhancedVolcano(results,
                         x = 'logFC',
                         y = 'adj.P.Val',
                         pCutoff = 0.05,
-                        FCcutoff = 1.0,
+                        FCcutoff = 0.75,
                         title = 'Volcano plot',
                         subtitle = 'Differential Expression Analysis')
 
@@ -167,9 +170,9 @@ volc <- EnhancedVolcano(results,
 normcounts_DEG <- as.data.frame(logCPM) %>% filter(rownames(logCPM) %in% DEGS$feature)
 
 metadata_DEG <-  data.frame(
-  dicho_NIA_reagan = as.factor(metadata$dicho_NIA_reagan),  # Replace with your actual metadata
-  row.names = colnames(counts_DEG)  # Ensure row names match column names of counts_DEG
-) %>% arrange(dicho_NIA_reagan)
+  cogdx = as.factor(metadata$cogdx),  # Replace with your actual metadata
+  row.names = colnames(normcounts_DEG)  # Ensure row names match column names of counts_DEG
+) %>% arrange(cogdx)
 
 #Order
 
