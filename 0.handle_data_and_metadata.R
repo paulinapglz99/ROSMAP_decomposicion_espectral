@@ -3,6 +3,8 @@
 #This pre-pre-process script reads ROSMAP metadata and FPKM counts data and handle both for further analysis
 #By paulinapglz.99@gmail.com
 
+#This data was directly downloaded from https://www.synapse.org/#!Synapse:syn27000096
+
 #libraries  ----- 
 
 pacman::p_load("dplyr",
@@ -25,8 +27,6 @@ summarize_by_tissue <- function(metadata, tissue_name) {
 ##################################### ROSMAP ##################################### 
 
 #Read metadata --- ---
-
-#This data was directly downloaded from https://www.synapse.org/#!Synapse:syn27000096
 
 metadata_ROSMAP <- vroom::vroom(file = '/datos/rosmap/data_by_counts/metadata/RNAseq_Harmonization_ROSMAP_combined_metadata.csv')
 dim(metadata_ROSMAP)
@@ -70,11 +70,12 @@ table(metadata_ROSMAP$is_AD, useNA = "ifany")
 #Define metadata by brain region --- ---
 
 tissues_ROSMAP <- unique(metadata_ROSMAP$tissue)
-#[1] "frontal cortex"                 "temporal cortex"                "dorsolateral prefrontal cortex" "Head of caudate nucleus"       
+#[1] "frontal cortex"                 "temporal cortex"  "dorsolateral prefrontal cortex" "Head of caudate nucleus"       
 #[5] "posterior cingulate cortex"    
 
 metadata_tissue_ROSMAP <- lapply(tissues_ROSMAP, 
                                  function(tissue) summarize_by_tissue(metadata_ROSMAP, tissue))
+names(metadata_tissue_ROSMAP) <- tissues_ROSMAP
 # 
 # Metadata dim frontal cortex:  123 42 
 # NIA-Reagan diagnosis table:
@@ -106,24 +107,29 @@ metadata_tissue_ROSMAP <- lapply(tissues_ROSMAP,
 
 #Metadata for frontal cortex (FC)
 # 
-#vroom::vroom_write(metadata_tissue_ROSMAP[[1]], file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/FC/RNA_seq_metadata_FC.txt")
-# 
+vroom::vroom_write(metadata_tissue_ROSMAP[["frontal cortex"]],
+                   file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/FC/RNA_seq_metadata_FC.txt")
+#
 # #Metadata for temporal cortex (TC)
-# 
-# vroom::vroom_write(metadata_tissue_ROSMAP[[2]], file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/TC/RNA_seq_metadata_TC.txt")
-# 
+#
+vroom::vroom_write(metadata_tissue_ROSMAP[["temporal cortex"]],
+                   file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/TC/RNA_seq_metadata_TC.txt")
+#
 # #Metadata Dorsolateral Prefrontal Cortex (DLPFC)
-# 
-# vroom::vroom_write(metadata_tissue_ROSMAP[[3]], file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/DLPFC/RNA_seq_metadata_DLPFC.txt")
-# 
+#
+vroom::vroom_write(metadata_tissue_ROSMAP[["dorsolateral prefrontal cortex"]],
+                   file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/DLPFC/RNA_seq_metadata_DLPFC.txt")
+#
 # #Metadata for Head of caudate nucleus (HCN)
-# 
-# vroom::vroom_write(metadata_tissue_ROSMAP[[4]], file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/HCN/RNA_seq_metadata_HCN.txt")
-# 
+#
+vroom::vroom_write(metadata_tissue_ROSMAP[["Head of caudate nucleus"]],
+                   file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/HCN/RNA_seq_metadata_HCN.txt")
+#
 # #Metadata for posterior cingulate cortex (PCC)
-# 
-# vroom::vroom_write(metadata_tissue_ROSMAP[[5]], file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/PCC/RNA_seq_metadata_PCC.txt")
-# 
+#
+vroom::vroom_write(metadata_tissue_ROSMAP[["posterior cingulate cortex"]],
+                   file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/PCC/RNA_seq_metadata_PCC.txt")
+#
 #Read expression data, there's 4 count archives --- ---
 
 #This data was directly downloaded from https://www.synapse.org/#!Synapse:syn3388564 
@@ -143,28 +149,33 @@ dim(counts_ROSMAP)
 
 #Counts from the frontal cortex
 
-counts_FC_ROSMAP <- counts_ROSMAP[, (colnames(counts_ROSMAP) %in% metadata_tissue_ROSMAP[[1]]$specimenID)] %>% mutate(features = counts_ROSMAP[1], .before = 1)
+counts_FC_ROSMAP <- counts_ROSMAP[, (colnames(counts_ROSMAP) %in% metadata_tissue_ROSMAP[[1]]$specimenID)]%>% 
+  mutate(features = counts_ROSMAP[1], .before = 1)
 dim(counts_FC_ROSMAP)
 #[1] 60607     124
 
 #Counts from the temporal cortex
 
-counts_TC_ROSMAP <- counts_ROSMAP[, (colnames(counts_ROSMAP) %in% metadata_tissue_ROSMAP[[2]]$specimenID)] %>% mutate(counts_ROSMAP[1], .before = 1)
+counts_TC_ROSMAP <- counts_ROSMAP[, (colnames(counts_ROSMAP) %in% metadata_tissue_ROSMAP[[2]]$specimenID)] %>% 
+  mutate(counts_ROSMAP[1], .before = 1)
 dim(counts_TC_ROSMAP)
 #[1] 60607     126
 
 #Counts for Dorsoral Prefrontal Cortex
-counts_DLPFC_ROSMAP <- counts_ROSMAP[, (colnames(counts_ROSMAP) %in% unique(metadata_tissue_ROSMAP[[3]]$specimenID))] %>% mutate(counts_ROSMAP[1], .before = 1)
+counts_DLPFC_ROSMAP <- counts_ROSMAP[, (colnames(counts_ROSMAP) %in% unique(metadata_tissue_ROSMAP[[3]]$specimenID))] %>%
+  mutate(counts_ROSMAP[1], .before = 1)
 dim(counts_DLPFC_ROSMAP)
 #[1] 60607   1142
 
 #Counts for  Head of caudate nucleus 
-counts_HCN_ROSMAP <- counts_ROSMAP[, (colnames(counts_ROSMAP) %in% unique(metadata_tissue_ROSMAP[[4]]$specimenID))] %>% mutate(counts_ROSMAP[1], .before = 1)
+counts_HCN_ROSMAP <- counts_ROSMAP[, (colnames(counts_ROSMAP) %in% unique(metadata_tissue_ROSMAP[[4]]$specimenID))] %>% 
+  mutate(counts_ROSMAP[1], .before = 1)
 dim(counts_HCN_ROSMAP)
 #[1] 60607   750
 
 #Counts for posterior cingulate cortex
-counts_PCC_ROSMAP <- counts_ROSMAP[, c(colnames(counts_ROSMAP) %in% metadata_tissue_ROSMAP[[5]]$specimenID)] %>% mutate(counts_ROSMAP[1], .before = 1)
+counts_PCC_ROSMAP <- counts_ROSMAP[, c(colnames(counts_ROSMAP) %in% metadata_tissue_ROSMAP[[5]]$specimenID)] %>%
+  mutate(counts_ROSMAP[1], .before = 1)
 dim(counts_PCC_ROSMAP)
 #[1] 60607   672
 
@@ -172,25 +183,38 @@ dim(counts_PCC_ROSMAP)
 
 #Counts for Dorsoral Prefrontal Cortex
 # 
-# vroom::vroom_write(counts_DLPFC, file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/full_counts/ROSMAP_RNAseq_rawcounts_DLPFC.txt")
+saveRDS(counts_DLPFC_ROSMAP, file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/full_counts/ROSMAP_RNAseq_rawcounts_DLPFC.rds")
 # 
 # #Counts for  Head of caudate nucleus
 # 
-# vroom::vroom_write(counts_HCN, file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/HCN/ROSMAP_RNAseq_rawcounts_HCN.txt")
+saveRDS(counts_HCN_ROSMAP, file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/HCN/ROSMAP_RNAseq_rawcounts_HCN.rds")
 # 
 # #Counts for posterior cingulate cortex
 # 
-# vroom::vroom_write(counts_PCC, file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/PCC/ROSMAP_RNAseq_rawcounts_PCC.txt")
+saveRDS(counts_PCC_ROSMAP, file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/PCC/ROSMAP_RNAseq_rawcounts_PCC.rds")
 # 
 # #Counts for Frontal Cortex
 # 
-# vroom::vroom_write(counts_FC, file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/FC/ROSMAP_RNAseq_rawcounts_FC.txt")
+saveRDS(counts_FC_ROSMAP, file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/FC/ROSMAP_RNAseq_rawcounts_FC.rds")
 # 
 # #Counts for Temporal cortex
 # 
-# vroom::vroom_write(counts_TC, file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/TC/ROSMAP_RNAseq_rawcounts_TC.txt")
+saveRDS(counts_TC_ROSMAP, file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/TC/ROSMAP_RNAseq_rawcounts_TC.rds")
 
 #Summarize ROSMAP --- ---
+
+sum_rosmap <- metadata_ROSMAP[,c("tissue", "dicho_NIA_reagan")]
+
+sum_rosmap <- sum_rosmap %>%
+  mutate(dicho_NIA_reagan = ifelse(is.na(dicho_NIA_reagan), "NA", as.character(dicho_NIA_reagan)))
+
+sum_rosmap <- sum_rosmap %>%
+  group_by(tissue, dicho_NIA_reagan) %>%
+  summarise(count = n()) %>%
+  ungroup()
+
+# Crear el gráfico
+
 sum_rosmap <- metadata_ROSMAP[,c("tissue", "dicho_NIA_reagan")]
 
 sum_rosmap <- sum_rosmap %>%
@@ -211,27 +235,7 @@ sum_rosmap.p <-ggplot(sum_rosmap, aes(x = tissue, y = count, fill = dicho_NIA_re
   labs(x = "Tissue", y = "Count", fill = "NIA Reagan") +
   ggtitle("Proporciones de NIA Reagan por Tejido") +
   scale_color_viridis()
-
-sum_rosmap <- metadata_ROSMAP[,c("tissue", "dicho_NIA_reagan")]
-
-sum_rosmap <- sum_rosmap %>%
-  mutate(dicho_NIA_reagan = ifelse(is.na(dicho_NIA_reagan), "NA", as.character(dicho_NIA_reagan)))
-
-sum_rosmap <- sum_rosmap %>%
-  group_by(tissue, dicho_NIA_reagan) %>%
-  summarise(count = n()) %>%
-  ungroup()
-
-# Crear el gráfico
-
-sum_rosmap.p <-ggplot(sum_rosmap, aes(x = tissue, y = count, fill = dicho_NIA_reagan)) +
-  geom_bar(stat = "identity") +
-  geom_text(aes(label = count), position = position_stack(vjust = 0.5)) + # Números de cada stack
- # geom_text(data = N, aes(x = tissue, y = total, label = total), vjust = -0.5) + # Números totales (N)
-  theme_minimal() +
-  labs(x = "Tissue", y = "Count", fill = "NIA Reagan") +
-  ggtitle("Proporciones de NIA Reagan por Tejido") +
-  scale_color_viridis()
+sum_rosmap.p
 
 #Now with is_AD
 
@@ -250,16 +254,14 @@ sum_rosmap_isAD <- sum_rosmap_isAD %>%
 sum_rosmap_isAD.p <- ggplot(sum_rosmap_isAD, aes(x = tissue, y = count, fill = is_AD)) +
   geom_bar(stat = "identity") +
   geom_text(aes(label = count), position = position_stack(vjust = 0.5)) + # Números de cada stack
-  # geom_text(data = N, aes(x = tissue, y = total, label = total), vjust = -0.5) + # Números totales (N)
   theme_minimal() +
   labs(x = "Tissue", y = "Count", fill = "is_AD") +
-  ggtitle("Proporciones de NIA Reagan por Tejido") +
+  ggtitle("Proporciones de AD Reagan por Tejido") +
   scale_color_viridis()
 
 ##################################### MSBB ##################################### 
 
 metadata_MSBB <- vroom::vroom(file = "/datos/rosmap/data_by_counts/metadata/RNAseq_Harmonization_MSBB_combined_metadata.csv")
-metadata_MSBB$Braak
 
 #Filter MSSB metadata 
 #Based on CDR classification, subjects are grouped as no cognitive deficits (CDR = 0),
@@ -277,7 +279,12 @@ metadata_MSBB <- metadata_MSBB %>%
   mutate(dicho_NIA_reagan = case_when(
     (NIA_reagan_ADLikelihood == "0" | NIA_reagan_ADLikelihood == "1") ~ "0", #no AD pathology
     (NIA_reagan_ADLikelihood == "2" | NIA_reagan_ADLikelihood == "3") ~ "1"  #AD pathology
-  )) %>% 
+  )) %>%
+  mutate(CDR_dicho = case_when(
+    CDR < 2  ~ "no_AD", 
+    CDR >= 0 ~ "dementia", 
+    TRUE ~ NA_character_ 
+  )) %>%
   mutate(is_resilient = case_when(
     CDR %in% c(3.0, 4.0, 5.0) & (Braak != 0 & (CERAD == 1 | CERAD ==2)) ~ "resilient", 
     TRUE ~ NA_character_ 
@@ -288,9 +295,7 @@ metadata_MSBB <- metadata_MSBB %>%
     CDR %in% c(1.0, 2.0) ~ "MCI",
     TRUE ~ NA_character_
   ))
-table(metadata_MSBB$CERAD) 
-# 1  <- enfermos 2   3   4 <- sanos
-# 353 567 175 164 
+table(metadata_MSBB$CDR_dicho, useNA = "ifany")
 
 table(metadata_MSBB$NIA_reagan_ADLikelihood, useNA = "ifany")
 
@@ -301,7 +306,10 @@ table(metadata_MSBB$is_AD, useNA = "ifany")
 
 tissues_MSBB <- unique(metadata_MSBB$tissue)
 
-metadata_tissue_MSBB <- lapply(tissues_MSBB, function(tissues_MSBB) summarize_by_tissue(metadata_MSBB, tissues_MSBB))
+metadata_tissue_MSBB <- lapply(tissues_MSBB,
+                               function(tissues_MSBB) summarize_by_tissue(metadata_MSBB, tissues_MSBB))
+
+names(metadata_tissue_MSBB) <- tissues_MSBB
 
 # Metadata dim superior temporal gyrus:  334 36 
 # NIA-Reagan diagnosis table:
@@ -380,19 +388,19 @@ vroom::vroom_write(counts_TC, file = "/datos/rosmap/data_by_counts/MSBB_counts/c
 
 #Summarize MSBB --- ---
 
-sum_msbb <- metadata_MSBB[,c("tissue", "dicho_NIA_reagan")]
+sum_msbb <- metadata_MSBB[,c("tissue", "CDR_dicho")]
 
 sum_msbb <- sum_msbb %>%
-  mutate(dicho_NIA_reagan = ifelse(is.na(dicho_NIA_reagan), "NA", as.character(dicho_NIA_reagan)))
+  mutate(CDR_dicho = ifelse(is.na(CDR_dicho), "NA", as.character(CDR_dicho)))
 
 sum_msbb <- sum_msbb %>%
-  group_by(tissue, dicho_NIA_reagan) %>%
+  group_by(tissue, CDR_dicho) %>%
   summarise(count = n()) %>%
   ungroup()
 
 # Crear el gráfico
 
-sum_msbb.p <- ggplot(sum_msbb, aes(x = tissue, y = count, fill = dicho_NIA_reagan)) +
+sum_msbb.p <- ggplot(sum_msbb, aes(x = tissue, y = count, fill = CDR_dicho)) +
   geom_bar(stat = "identity") +
   geom_text(aes(label = count), position = position_stack(vjust = 0.5)) + # Números de cada stack
   # geom_text(data = N, aes(x = tissue, y = total, label = total), vjust = -0.5) + # Números totales (N)
@@ -400,31 +408,7 @@ sum_msbb.p <- ggplot(sum_msbb, aes(x = tissue, y = count, fill = dicho_NIA_reaga
   labs(x = "Tissue", y = "Count", fill = "NIA Reagan") +
   ggtitle("Proporciones de NIA Reagan por Tejido") +
   scale_color_viridis()
-
-#Con is_AD
-
-
-sum_MSBB_isAD <- metadata_MSBB[,c("tissue", "is_AD")]
-
-sum_MSBB_isAD <- sum_rosmap_isAD %>%
-  mutate(dicho_NIA_reagan = ifelse(is.na(dicho_NIA_reagan), "NA", as.character(dicho_NIA_reagan)))
-
-sum_rosmap_isAD <- sum_rosmap_isAD %>%
-  group_by(tissue, is_AD) %>%
-  summarise(count = n()) %>%
-  ungroup()
-
-# Crear el gráfico
-
-sum_rosmap_isAD.p <- ggplot(sum_rosmap_isAD, aes(x = tissue, y = count, fill = is_AD)) +
-  geom_bar(stat = "identity") +
-  geom_text(aes(label = count), position = position_stack(vjust = 0.5)) + # Números de cada stack
-  # geom_text(data = N, aes(x = tissue, y = total, label = total), vjust = -0.5) + # Números totales (N)
-  theme_minimal() +
-  labs(x = "Tissue", y = "Count", fill = "is_AD") +
-  ggtitle("Proporciones de NIA Reagan por Tejido") +
-  scale_color_viridis()
-
+sum_msbb.p
 
 ##################################### Mayo Clinic ##################################### 
 
@@ -432,7 +416,10 @@ metadata_Mayo <- vroom::vroom(file = "/datos/rosmap/data_by_counts/metadata/RNAs
 
 tissues_Mayo <- unique(metadata_Mayo$tissue)
 
-metadata_tissue_Mayo <- lapply(tissues_Mayo, function(tissues_Mayo) summarize_by_tissue(metadata_Mayo, tissues_Mayo))
+metadata_tissue_Mayo <- lapply(tissues_Mayo,
+                               function(tissues_Mayo) summarize_by_tissue(metadata_Mayo, tissues_Mayo))
+
+names(metadata_tissue_Mayo) <- tissues_Mayo
 
 #Get expression data --- ---
 
@@ -441,15 +428,17 @@ counts_Mayo <-  vroom::vroom(file = "/datos/rosmap/data_by_counts/Mayo_counts/Ma
 #Stratify by brain region --- ---
 
 #counts for cerebellum
-counts_CRB_Mayo <- counts_Mayo[, (colnames(counts_Mayo) %in% metadata_tissue_Mayo[[1]]$specimenID)] %>% mutate(features = counts_Mayo[1], .before = 1)
+counts_CRB_Mayo <- counts_Mayo[, (colnames(counts_Mayo) %in% metadata_tissue_Mayo[[1]]$specimenID)] %>% 
+  mutate(features = counts_Mayo[1], .before = 1)
 dim(counts_CRB_Mayo)
 
 #Counts from Temporal cortex
 
-counts_TC_Mayo <- counts_Mayo[, (colnames(counts_Mayo) %in% metadata_tissue_Mayo[[2]]$specimenID)] %>% mutate(counts_Mayo[1], .before = 1)
+counts_TC_Mayo <- counts_Mayo[, (colnames(counts_Mayo) %in% metadata_tissue_Mayo[[2]]$specimenID)] %>% 
+  mutate(counts_Mayo[1], .before = 1)
 dim(counts_TC_Mayo)
 
-#Save count data for MSBB ---- ---
+#Save count data for Mayo ---- ---
 
 # Counts for cerebellum
 
@@ -470,8 +459,6 @@ sum_mayo <- sum_mayo %>%
   group_by(tissue, diagnosis) %>%
   summarise(count = n()) %>%
   ungroup()
-
-# Crear el gráfico
 
 sum_mayo.p <- ggplot(sum_mayo, aes(x = tissue, y = count, fill = diagnosis)) +
   geom_bar(stat = "identity") +
