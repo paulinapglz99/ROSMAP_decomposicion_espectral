@@ -8,29 +8,106 @@
 
 #Here we use the NOISeq, edgeR and EDAseq packages for bias detection and correction
 
-pacman::p_load('dplyr', 
+pacman::p_load('tidyverse', 
                'biomaRt',
                'NOISeq',
                'edgeR', 
                'EDASeq', 
                "ggplot2")
 
-#
+#Seed --- ---
 
 set.seed(10)
+
+#Functions  --- ---
+
+#Homogenize metadata for sex
+homogenize_exclude <- function(metadata) {
+  unique_values <- unique(metadata$exclude)
+  
+  if ("TRUE" %in% unique_values && any(is.na(unique_values))) {
+    # Caso 1: TRUE para excluir, NA para mantener
+    metadata <- metadata %>% mutate(exclude = ifelse(is.na(exclude), FALSE, TRUE))
+  } else {
+    # Caso 2: FALSE para mantener, TRUE para excluir
+    metadata <- metadata %>% mutate(exclude = ifelse(exclude == FALSE, FALSE, TRUE))
+  }
+  
+  return(metadata)
+}
+
+#Delete duplicates
+del_dupl <- function(counts) {
+  # Verificar genes repetidos
+  repeated_values <- counts %>%
+    group_by(feature) %>%
+    filter(n() > 1) %>%
+    distinct(feature) %>%
+    pull(feature)
+  
+  # Ver las filas duplicadas
+  repeated_rows <- counts[counts$feature %in% repeated_values, ]
+  
+  # Ordenar y calcular la mediana de los valores duplicados
+  repeated_rows <- repeated_rows[order(repeated_rows$feature),]
+  repeated_rows <- repeated_rows %>%
+    group_by(feature) %>%
+    summarize(across(everything(), median, na.rm = TRUE))
+  
+  # Eliminar las filas duplicadas y agregar las filas con la mediana calculada
+  counts <- counts %>% filter(!feature %in% repeated_rows$feature)
+  counts <- bind_rows(counts, repeated_rows)
+  
+  # Convertir las columnas seleccionadas a enteros
+  counts <- counts %>% mutate(across(-feature, as.integer))
+  
+  return(counts)
+}
+
 #Get the data --- ---
 
 #Read counts data, this was already filtered by 1.QC_pre_analysis.R
 
-counts <- vroom::vroom(file = '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/full_counts/ROSMAP_RNAseq_filtered_counts_DLPFC.txt') %>% as.data.frame()
+counts <- readRDS(file = '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/full_counts/ROSMAP_RNAseq_rawcounts_DLPFC.rds') %>%
+  as.data.frame()
 dim(counts)
 #[1] 60558   1142
 
 #Obtain factors from metadata --- --- 
 
-metadata <- vroom::vroom(file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/DLPFC/RNA_seq_metadata_filtered_DLPFC.txt")
+metadata <- vroom::vroom(file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/DLPFC/RNA_seq_metadata_DLPFC.txt")
 dim(metadata)
 #[1] 1141  41
+
+# Acondicionar metadata
+
+metadata <- homogenize_exclude(metadata)
+
+#Replace msex with sex
+names(metadata) <- ifelse(names(metadata) == "msex", "sex", names(metadata))
+
+#Exclude specimens by metadata
+
+metadata <- metadata %>% filter(exclude == FALSE)
+metadata <- metadata %>% filter(if_all(c(ceradsc, sex), ~ !is.na(.)))
+dim(metadata)
+
+#Acondicionar conteos
+
+counts <- counts[-c(1:4), ]
+dim(counts)
+
+#Delete duplicates
+
+counts <- counts %>% mutate(feature = str_remove(feature, "\\..*$"))
+
+counts <- del_dupl(counts)
+dim(counts)
+
+#Counts
+
+counts <- counts %>% dplyr::select(1, all_of(metadata$specimenID))
+dim(counts)
 
 #I do this to make sure the rowlength of factors match with the counts columns, it is like metadata filtering
 
@@ -38,26 +115,17 @@ factors <- data.frame("specimenID" = colnames(counts)[-1])
 
 #Left join with metadata
 
-factors <- factors %>% left_join(metadata, by = "specimenID")
-
-factors <- factors %>% dplyr::select(c(specimenID, sequencingBatch, RIN, dicho_NIA_reagan))
-
-factors <- factors %>% filter(!is.na(dicho_NIA_reagan))
+factors <- factors %>% left_join(metadata, by = "specimenID") %>% dplyr::select(c(specimenID, ceradsc, sex))
 dim(factors)
-#[1] 446  4
-#[1] 499   6 <- 
-#[1] 880   4
 
 #Filter again counts
 
 counts <- counts %>% dplyr::select(1,intersect(colnames(counts), factors$specimenID))
 dim(counts)
-#[1] 60558   500 
-#[1] 60558   881 <-
 
 #Set names to rows 
-
-rownames(counts) <- counts$feature
+rownames(counts) <- NULL
+counts <- counts %>% column_to_rownames(var = "feature")
 
 #Annotation with ensembl --- ---
 
@@ -71,69 +139,20 @@ myannot <- getBM(attributes = c("ensembl_gene_id",
                                 "percentage_gene_gc_content", "gene_biotype",
                                 "start_position","end_position","hgnc_symbol"),
                  filters = "ensembl_gene_id", 
-                 values =  counts$feature,  #annotate the genes in the count matrix 
+                 values =  rownames(counts),  #annotate the genes in the count matrix 
                  mart = mart)
 
-#Rename column to match our data
 
-myannot <- myannot %>% rename(ensembl_gene_id = "feature")
-
+myannot <- myannot %>%  rename(feature = ensembl_gene_id)
 #Add length column
 
 myannot$length <- abs(myannot$end_position-myannot$start_position)
 dim(myannot)
-#[1] 60229     7
-#[1] 60122     7 <- 
-
-# NOISeq object --- ----
-
-#Give format to table for NOIseq purposes
-
-#gene_names <- myannot$feature
-
-#rownames(expression_counts) <- gene_names    #for the counts
-#rownames(scaled_expression_counts) <- gene_names #for the NOISeq object to PCA
-
-#Names of features characteristics
-
-#mylength <- setNames(myannot$length, myannot$feature)
-
-#mygc <- setNames(myannot$percentage_gene_gc_content, myannot$feature)
-
-#mybiotype <-setNames(myannot$gene_biotype, myannot$feature)
-
-
-#NOTE: I create here two NOISeq objects, one is only for building a PCA, the other one
-#will be used for bias detection and solving, as dat() does not accept centered and scaled data
-
-#Create NOISeq object FOR PCA --- ---
-
-#noiseqData_PCAori <- NOISeq::readData(data = scaled_expression_counts,
-#                                   factors = factors,           #variables indicating the experimental group for each sample
-#                                   gc = mygc,                   #%GC in myannot
-#                                   biotype = mybiotype,         #biotype
-#                                   length =  mylength)          #gene length
-
-#check for batch effect
-
-#myPCA_ori <- dat(noiseqData_PCA, 
-#             type = "PCA",   #PCA type of plot
-#             norm = F,       #indicating data are already normalized
-#             logtransf = T)  #if T, it doesn't perform logtrasnf
-
-#Plot PCA
-#In this PCA, each point is a specimenID, and PCs are explained by gene variance
-
-#png("/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/bias_plots/PCA_Ori.png")
-#explo.plot(myPCA,
-#           plottype = "scores",
-#           factor = NULL)   #use all factors
-#dev.off()
 
 #Create NOISeq object bias detect and bias correction --- ---
 
 #For NOISeq, order of factors$specimenIDs and  colnames(expression_counts)[-1] must match
-#> identical(colnames(expression_counts)[-1], factors$specimenID)
+identical(colnames(counts), factors$specimenID)
 #[1] TRUE
 
 #Names of features characteristics
@@ -146,7 +165,7 @@ mybiotype <-setNames(myannot$gene_biotype, myannot$feature)
 
 #Create NOISeq object
 
-noiseqData <- NOISeq::readData(data = counts[-1],
+noiseqData <- NOISeq::readData(data = counts,
                                factors = factors,           #variables indicating the experimental group for each sample
                                gc = mygc,                   #%GC in myannot
                                biotype = mybiotype,         #biotype
@@ -375,15 +394,15 @@ table(mycd_lessbias@dat$DiagnosticTest[,  "Diagnostic Test"])
 #TMM normalization adjusts library sizes based on the assumption that most genes are not differentially expressed.
 
 norm_count <- NOISeq::tmm(normCounts(lFull),
-                        long = 1000,  # If long == 1000, no length correction is applied (no matter the value of parameter lc). 
-                        lc = 0, # If lc = 0, no length correction is applied
-                        k = 0) # By default, k = 0. 
+                          long = 1000,  # If long == 1000, no length correction is applied (no matter the value of parameter lc). 
+                          lc = 0, # If lc = 0, no length correction is applied
+                          k = 0) # By default, k = 0. 
 
 noiseqData_norm_count <- NOISeq::readData(data = norm_count, 
-                                    factors = factors)
+                                          factors = factors)
 
 #cd has to preceed ARSyN or it won't work
- 
+
 mycd_norm <- NOISeq::dat(noiseqData_norm_count,
                          type="cd",
                          norm=TRUE)

@@ -36,43 +36,11 @@ convert_ens_to_symbol <- function(ensembl_ids) {
 
 #Get data --- ---
 
-counts <- vroom::vroom(file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/full_counts/ROSMAP_RNAseq_rawcounts_DLPFC.txt") %>% as.data.frame()
-counts <- counts[ -c(1:4),] #Delete alignment stats
-counts$feature <- str_remove(counts$feature, "\\..*$")
-
-# Verify repeated genes in 'feature' column
-repeated_values <- counts %>%
-  group_by(feature) %>%
-  filter(n() > 1) %>%
-  distinct(feature) %>%
-  pull(feature)
-length(repeated_values)
-
-# Delete duplicates
-repeated_rows <- counts[counts$feature %in% repeated_values, ]
-dim(repeated_rows)
-
-repeated_rows <- repeated_rows[order(repeated_rows$feature),]
-
-repeated_rows <- repeated_rows %>%
-  group_by(feature) %>%
-  summarize(across(everything(), median, na.rm = TRUE))
-dim(repeated_rows)
-
-#Delete rows in the matrix
-
-counts <- counts %>% filter(!feature  %in% repeated_rows$feature)
+counts <- readRDS(file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/full_counts/ROSMAP_RNAseq_filteredQC_counts_DLPFC.rds") %>% as.data.frame()
 dim(counts)
-counts <- bind_rows(counts, repeated_rows)
-dim(counts)
-#[1] 60558  1142
-
-rownames(counts) <- counts$feature
-#  Convert selected columns to integers using dplyr
-counts <- counts %>% mutate(across(-feature, as.integer))
 
 # Get metadata
-metadata <- vroom::vroom(file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/DLPFC/RNA_seq_metadata_DLPFC.txt")
+metadata <- vroom::vroom(file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/DLPFC/RNA_seq_metadata_filteredQC_DLPFC.txt")
 dim(metadata)
 #[1] 1141   41
 
@@ -98,25 +66,14 @@ coldata <- as.data.frame(colnames(counts))
 colnames(coldata) <- "specimenID"
 
 coldata <- coldata %>% left_join(metadata, by = "specimenID")
-coldata <- coldata %>% dplyr::select("specimenID", "sequencingBatch","msex","cogdx", "ceradsc", "dicho_NIA_reagan")
+coldata <- coldata %>% dplyr::select("specimenID", "sequencingBatch","sex","cogdx", "ceradsc", "dicho_NIA_reagan")
 coldata$dicho_NIA_reagan <- as.factor(coldata$dicho_NIA_reagan)  #Convert to factor
 
 #DESeqData object
 
 dds <- DESeqDataSetFromMatrix(countData = counts, 
                               colData = coldata,
-                              design = ~ sequencingBatch + dicho_NIA_reagan) #En caso unicamente de comparar diagnostico
-
-#Pre-filtering
-
-# A recommendation for the minimal number of samples is to specify the smallest group size, e.g. here there are 3 treated samples.
-smallestGroupSize <- 3
-#Here we perform pre-filtering to keep only rows that have a count of at least 10 for a minimal number of samples.
-#The count of 10 is a reasonable choice for bulk RNA-seq.
-keep <- rowSums(counts(dds) >= 10) >= smallestGroupSize
-dds <- dds[keep,]
-dim(dds)
-#[1] 30657   880
+                              design = ~ dicho_NIA_reagan) #En caso unicamente de comparar diagnostico
 
 #Differential expression analysis --- ---
 
@@ -130,7 +87,7 @@ dds <- DESeq(dds)  #Slow
 
 res <- results(dds,
                contrast = c("dicho_NIA_reagan", "1", "0"), #contrast = c("condition", "problem", "control"))
-               pAdjustMethod = 'BH', 
+               pAdjustMethod = 'BH',   #he method to use for adjusting p-values
                alpha = 0.05) #FDR
 
 #How many adjusted p-values were less than 0.05?
@@ -197,7 +154,7 @@ DEGS <-  DEGS %>% left_join(baseMean_DEGS, by = c("ensembl_gene_id" = "feature")
 # 
 # #Save DEGs list --- ---
 # 
-#vroom::vroom_write(DEGS, file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/DEGs/ROSMAP_DLFPC_DEGS_dichoNIAReagan.txt")
+#vroom::vroom_write(DEGS, file = "q")
 
 #Vulcano plot --- ---
 
@@ -212,7 +169,7 @@ vplot <-  ggplot(data=res.df, aes(x=log2FoldChange, y= -log10(padj),  col = diff
   geom_hline(yintercept=-log10(0.05), col="red") + #p-value threshold is 0.05
   scale_color_manual(values=c("#4E8098", "gray", "#A31621")) +
   theme_minimal() +
-  geom_text_repel() +
+  geom_text_repel(max.overlaps = 50) +
   labs(title = "Differential expression", 
        subtitle = "Using dichotomic NIA-Reagan Criteria")
 
@@ -228,7 +185,7 @@ ggsave("/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/DEGs/R
 
 #Create matrix of DEG counts --- ---
 
-DEG_mat <- BiocGenerics::counts(dds, normalized = F) %>% as.data.frame()
+DEG_mat <- BiocGenerics::counts(dds, normalized = T) %>% as.data.frame()
 DEG_mat <- DEG_mat %>% filter(rownames(DEG_mat) %in% DEGS$ensembl_gene_id)
 dim(DEG_mat)
 #[1] 28  880
@@ -241,39 +198,23 @@ dim(DEG_mat)
 # 
 # DEG_mat.z[1:20, 1:20]
 
-#You can also try (I think this is better)
+#You can also try (I think this is better) 
 
-#Estimate dispersion trend and apply a variance stabilizing transformation
-rld <- rlog(as.matrix(DEG_mat), 
-           blind = F) #whether to blind the transformation to the experimental design 
+normcounts_DEG <- normcounts[rownames(DEG_mat),]
 
-trad <- convert_ens_to_symbol(rownames(rld))
-
-rownames(rld) <- trad$external_gene_name
-
-# Z score heatmap --- ---
-
-Z <- t(scale(t(rld)))
-dim(Z)
-
-# Crear el heatmap
-
-z.p <- pheatmap(Z, 
-         name = "Row Z-Score", 
-         color = colorRampPalette(c("navy", "white", "firebrick3"))(50), 
-         clustering_distance_rows = "euclidean", 
-         clustering_method = "ward.D2", 
-         fontsize = 11, 
-         angle_col = "45", 
-         show_rownames = T)
+htmap <- pheatmap(DEG_mat,
+         cluster_rows = T,   # Cluster the rows
+         cluster_cols = T,   # Do not cluster the columns
+         main = "Heatmap of Differentially Expressed Genes", 
+     #    annotation_col = metadata_DEG,
+         show_colnames = FALSE  # Hide the column names (sample names)
+)
 
 # Save heatmaps --- ---
-
-#zscores.p
-# 
+ 
 # ggsave("/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/DEGs/ROSMAP_dicho_NIAReagan_zscores.png", 
-#        plot = zscores.p, 
+#        plot = htmap, 
 #        width = 11,
 #        height = 15,
-#        units = "in",
+#        units = "in",Screenshot from 2024-08-21 15-17-00
 #        dpi = 300)
