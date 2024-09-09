@@ -11,9 +11,8 @@ pacman::p_load('tidyverse',
 #Read adjacency matrix --- ---
 
 #This matrix may be very heavy
-matrix <- readRDS("/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/MI_matrices_NIA_Reagan/ROSMAP_DLFPC_RNAseq_MutualInfo_AD_NIA_Reagan_dicho.rds")
+matrix <- readRDS("/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/MI_matrices_NIA_Reagan/ROSMAP_DLFPC_RNAseq_MutualInfo_AD_NIA_Reagan_dicho.rds")
 dim(matrix)
-#[1] 22070 22070 <- AD
 
 matrix <- as.data.frame(matrix)
 
@@ -27,7 +26,6 @@ full_edgelist <- matrix %>%
   pivot_longer(-feature, names_to = "gene_to", 
                values_to = "MI")
 dim(full_edgelist)
-# [1] 223,532,401         3
 #[1] 487,084,900         3
 
 #As matrix is only the upper triangle, we must deplete NAs
@@ -37,11 +35,10 @@ class(full_edgelist$MI)
 
 full_edgelist <- full_edgelist %>% filter(!is.na(MI))
 dim(full_edgelist)
-#[1] 243531415         3
+#[1] 53369946        3
 
 #save edgelist for later
 
-vroom::vroom_write(full_edgelist, file = '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/MI_matrices_NIA_Reagan/ROSMAP_DLFPC_RNAseq_MutualInfo_noAD_NIA_Reagan_dicho_edgelist.txt')
-#This edgelist can be found as /datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/MI_matrices_NIA_Reagan/ROSMAP_DLFPC_RNAseq_MutualInfo_AD_NIA_Reagan_dicho_edgelist.txt.gz
+saveRDS(full_edgelist, file = '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/MI_matrices_NIA_Reagan/ROSMAP_DLFPC_RNAseq_MutualInfo_AD_NIA_Reagan_dicho_edgelist.rds')
 
 #END

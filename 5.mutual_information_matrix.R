@@ -10,24 +10,17 @@ pacman::p_load('future',
 
 #read data ----------
 
-mat_dis <- vroom::vroom(file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/ROSMAP_DLFPC_noAD_NIAReagan_discretizedmatrix.txt")
+mat_dis <- readRDS(file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/ROSMAP_DLFPC_AD_NIAReagan_discretizedmatrix.rds")
 
 # indexing data --------------
 
-my_index <- colnames(mat_dis)[-1] %>% as.character()
+my_index <- colnames(mat_dis) %>% as.character()
 
 #Create vector with named indexes
 
 my_index_i <- seq_along(my_index) #index number of my_index
 
 names(my_index_i) <- my_index  #giving names to index
-
-#Mutual information can't calculate for 1st column, because those are the gene names, so 
-mat_dis <- mat_dis[-1]
-dim(mat_dis)
-#[1]   434 14951
-#[1]   181 22070 <- AD
-#[1]   316 22070 <- noAD
 
 #the dimensions of the number of variables in mat_dis and the vector size must be the same
 

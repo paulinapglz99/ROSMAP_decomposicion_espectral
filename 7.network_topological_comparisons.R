@@ -10,7 +10,30 @@
 
 pacman::p_load("igraph", 
                "ggraph",
-               "tidyverse")
+               "tidyverse", 
+               "gridExtra")
+
+#Set seed --- --- 
+
+set.seed(10)
+
+#Declare functions --- --- 
+
+#Declare function that compares edges
+
+jaccard_edges <- function(g1, g2){
+  return(length(E(igraph::intersection(g1, g2)))/length(E(igraph::union(g1, g2))))
+}
+
+#Declare function that compares nodes
+
+jaccard_nodes <- function(g1,g2){
+  a = sort(vertex.attributes(graph = g1)[["name"]])
+  b = sort(vertex.attributes(graph = g2)[["name"]])
+  
+  deLaCueva = length(intersect(a,b))/length(union(a,b))
+  return(deLaCueva)
+}
 
 #Get data --- --- 
 
@@ -23,23 +46,7 @@ graphnoAD <- read_graph(file = '/datos/rosmap/data_by_counts/ROSMAP_counts/count
 graphLists = list(graphAD = graphAD,
                   graphnoAD = graphnoAD)
 
-#Set seed --- --- 
-
-set.seed(10)
-
 #Network topological comparison --- --- 
-
-#Calculate clustering coefficient of both networks
-
-clustering_coefficient <- sapply(X = graphLists, FUN = transitivity)
-
-#graphAD graphnoAD 
-#0.4522337 0.4454295 
-
-#  graphAD graphnoAD <- 
-#0.4324213 0.4251001 
-
-#Degree distributions look the same? --- --- 
 
 #Table of degree distribution
 
@@ -49,89 +56,71 @@ degree_distributions <- sapply(X = graphLists, FUN = degree)
 #Build degree distribution dataframe
 
 ADdegree <- degree_distributions[["graphAD"]]
+ADdegree.df <- data.frame(gene = names(ADdegree), degree = ADdegree)
+ADdegree_freq <- table(ADdegree.df$degree) %>% as.data.frame()
 
 noADdegree <- degree_distributions[["graphnoAD"]]
+noADdegree.df <- data.frame(gene = names(noADdegree), degree = noADdegree)
+noADdegree_freq <- table(noADdegree.df$degree) %>% as.data.frame()
 
-degree_distributions <- rbind(data_frame(gene = names(ADdegree), degree = ADdegree, dx = "AD"), 
-                              data_frame(gene = names(noADdegree), degree = noADdegree, dx = "noAD"))
+# Find the max value of "Freq" in both networks
+max_freq_AD <- max(ADdegree_freq$Freq)
+max_freq_noAD <- max(noADdegree_freq$Freq)
+
+# Find max degree value in both graphs 
+max_degree_AD <- max(as.numeric(as.character(ADdegree_freq$Var1)))
+max_degree_noAD <- max(as.numeric(as.character(noADdegree_freq$Var1)))
+
+# Define limits for make histograms comparable
+max_y <- max(max_freq_AD, max_freq_noAD)
+max_x <- max(max_degree_AD, max_degree_noAD)
 
 #Plot both degree distributions
 
-degree_dis <- ggplot(degree_distributions, aes(x = degree, fill = dx)) +
-  geom_histogram(binwidth = 1, color = "black", alpha =0.5, position = "identity") +
+degree_disAD <- ggplot(ADdegree.df, aes(x = degree)) +
+  geom_histogram(binwidth = 1, color = "black", fill = "#961D4E", position = "identity") +
   labs(title = "Node degree distributions",
-       subtitle = "for AD and noAD coexpression networks", 
+       subtitle = "for AD coexpression network", 
        x = "Degree",
        y = "Freq") +
   theme_minimal() +
-  scale_fill_manual(values = c("AD" = "darkblue", "noAD" = "pink")) +
+  scale_y_continuous(limits = c(0, max_y), expand = c(0, 0)) + 
+  scale_x_continuous(limits = c(0, max_x), breaks = seq(0, max_x, by = 10)) + 
+  scale_fill_manual() +
   guides(fill = guide_legend(title = "Diagnosis"))
 
-#Vis
-degree_dis
+degree_disnoAD <- ggplot(noADdegree.df, aes(x = degree)) +
+  geom_histogram(binwidth = 1,color = "black", fill = "#6153CC",  position = "identity") +
+  labs(title = "Node degree distributions",
+       subtitle = "for no AD coexpression network", 
+       x = "Degree",
+       y = "Freq") +
+  theme_minimal() +
+  scale_y_continuous(limits = c(0, max_y), expand = c(0, 0)) +  # Normalizar el eje y
+  scale_x_continuous(limits = c(0, max_x),breaks = seq(0, max_x, by = 10)) + 
+  scale_fill_manual() +
+  guides(fill = guide_legend(title = "Diagnosis"))
 
-#ggsave(filename = "~/redesROSMAP/ROSMAP_RNASeq_networks/bothdx_degree_distributions_coexpression_NIAReagan_histogram.png", 
-#       plot = degree_dis, 
-#       width = 20,
-#       height = 15, 
+#Arrange in a grid
+
+degree_dis <- grid.arrange(degree_disAD, degree_disnoAD, ncol =1 )
+
+#Save plot
+
+# ggsave(filename = "bothdx_degree_distributions_coexpression_NIAReagan_histogram.png",
+#       plot = degree_dis,
+#       width = 25,
+#       height = 20,
 #       units = "cm",
 #       dpi = 300,
 #       )
 
-#Do they have similar nodes? --- --- 
+#Calculate clustering coefficient of both networks
 
-#To make the topological comparison for nodes and edges we use the Jaccard index
-
-#Declare function that compares nodes
-
-jaccard_nodes <- function(g1,g2){
-  a = sort(vertex.attributes(graph = g1)[["name"]])
-  b = sort(vertex.attributes(graph = g2)[["name"]])
-  
-  deLaCueva = length(intersect(a,b))/length(union(a,b))
-  return(deLaCueva)
-}
-
-#Apply function to compare nodes
-
-NodesJaccard <- sapply(X = graphLists, FUN = jaccard_nodes, g1 = graphnoAD)
-NodesJaccard
-
-#graphAD graphnoAD 
-#0.603139  1.000000 
-
-#graphAD graphnoAD  <-----
-#0.6465551 1.0000000 
-
-#Do they have similar edges? --- ---
-
-#Declare function that compares edges
-
-jaccard_edges <- function(g1, g2){
-  return(length(E(igraph::intersection(g1, g2)))/length(E(igraph::union(g1, g2))))
-}
-
-#Apply function to compare edges
-
-EdgesJaccard <- sapply(X = graphLists, FUN = jaccard_edges, g1 = graphnoAD)
-EdgesJaccard
+clustering_coefficient <- sapply(X = graphLists, FUN = transitivity)
 
 # graphAD graphnoAD 
-#0.3561419 1.0000000 
-
-# graphAD graphnoAD 
-#0.4396761 1.0000000 
-
-#Apply modularity algorithm --- ---
-
-#Mutual information must be taken into account as weights of the edges
-
-infomap_modularity <- list()
-
-for (i in 1:length(graphLists)) {
-  # Aplicar cluster_infomap a cada grafo y almacenar el resultado en results_list
-  infomap_modularity[[i]] <- cluster_infomap(graph = graphLists[[i]], e.weights = graphLists[[i]]$MI)
-}
+# 0.3357295 0.2979033 
 
 # Extract information from the modules
 
@@ -142,38 +131,6 @@ membership_modularity <- sapply(X = infomap_modularity, FUN = membership)
 V(graphAD)$modules <- membership_modularity[[1]]
 
 V(graphnoAD)$modules <- membership_modularity[[2]]
-
-# Plot the graph with ggraph and color by module.
-
-#For AD graph
-ggraph(graphAD, layout = 'kk') +
-  geom_edge_link(alpha = 0.6, size = 0.3) +
-  geom_node_point(aes(color = factor(modules))) +
-  #scale_color_manual(values = rainbow(max(membership_modularity[["graphAD"]]))) +
-  theme_void() +
-  ggtitle("Nodes colored by module for AD graph")
-
-#For noADgraph
-
-ggraph(graphnoAD, layout = 'kk') +
-  geom_edge_link(alpha = 0.6, size = 0.3) +
-  geom_node_point(aes(color = factor(modules))) +
-  #scale_color_manual(values = rainbow(max(membership_modularity[["graphnoAD"]]))) +
-  theme_void() +
-  ggtitle("Nodes colored by module for noAD graph")
-
-#Comparison of modular structures --- ---
-
-#The modularity index Q modularity(), is a measure of the proportion of edges that occur within communities,
-#relative to the expected proportion if all edges were placed randomly.
-
-modularity_scoreAD <- modularity(graphAD, membership_modularity[[1]])
-#[1] 0.3620513
-#[1] 0.2564482 <-
-
-modularity_scorenoAD <- modularity(graphnoAD, membership_modularity[[2]])
-#[1] 0.3860467
-#[1] 0.316603 <- 
 
 #Comparison of modular structures between networks --- --- 
 
@@ -207,11 +164,47 @@ graphAD_plus <- add_vertices(graphAD, nv = length(missing_elements_in_ADnodes))
 
 graphnoAD_plus <- add_vertices(graphnoAD, nv = length(missing_elements_in_noADnodes))
 
+#Set list of graphs
+
+graphLists_plus <- list(graphAD_plus = graphAD_plus, 
+                        graphnoAD_plus =graphnoAD_plus)
+
+#Do they have similar nodes? --- --- 
+
+#To make the topological comparison for nodes and edges we use the Jaccard index
+
+#Apply function to compare nodes
+
+NodesJaccard <- sapply(X = graphLists_plus, FUN = jaccard_nodes, g1 = graphLists_plus[[2]])
+NodesJaccard
+
+#graphAD graphnoAD  <-----
+#0.6465551 1.0000000 
+
+#Do they have similar edges? --- ---
+
+#Apply function to compare edges
+
+EdgesJaccard <- sapply(X = graphLists_plus, FUN = jaccard_edges, g1 = graphLists_plus[[1]])
+EdgesJaccard
+
+#Apply modularity algorithm --- ---
+
+#Mutual information must be taken into account as weights of the edges
+
+infomap_modularity <- list()
+
+for (i in 1:length(graphLists)) {
+  # Aplicar cluster_infomap a cada grafo y almacenar el resultado en results_list
+  infomap_modularity[[i]] <- cluster_infomap(graph = graphLists[[i]], e.weights = graphLists[[i]]$mut_info_norm)
+}
+
+
 # Extract information from the modules
 
-graphAD_plus_modu <- cluster_infomap(graphAD_plus, e.weights = graphAD_plus$MI)
+graphAD_plus_modu <- cluster_infomap(graphAD_plus, e.weights = graphAD_plus$mut_info_norm)
 
-graphnoAD_plus_modu <- cluster_infomap(graphnoAD_plus, e.weights = graphnoAD_plus$MI)
+graphnoAD_plus_modu <- cluster_infomap(graphnoAD_plus, e.weights = graphnoAD_plus$mut_info_norm)
 
 #Modules from plus networks
 

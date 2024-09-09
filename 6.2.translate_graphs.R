@@ -3,7 +3,22 @@
 #This function allows you to change the vertex names of a graph. It translates vertices in ensembl to symbol. 
 #paulinapglz.99@gmail.com
 
+pacman::p_load('igraph',
+               'dplyr', 
+               'biomaRt')
+
 # Define function to change names of vertex for symbol names --- ---
+
+# Connecting to the Ensembl database through biomaRt
+mart <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+
+# Define function to convert from ENSMBL to SYMBOL
+convert_ens_to_symbol <- function(ensembl_ids) {
+  getBM(attributes = c("ensembl_gene_id", "external_gene_name", "chromosome_name"),
+        filters = "ensembl_gene_id",
+        values = ensembl_ids,
+        mart = mart)
+}
 
 translate_vertex_names <- function(graph) {
   # Extract vertex names
@@ -46,11 +61,11 @@ graphs <- list(graphAD = graphAD,
 graphs_trad <- sapply(graphs, translate_vertex_names)
 
 #Save graphs --- ---
+ 
+write_graph(graphs_trad[["graphAD"]], file = '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/ROSMAP_RNAseq_DLPFC_AD_MutualInfograph_percentile99.99_trad.graphml',
+            format = "graphml")
 # 
-# write_graph(graphs_trad[[1]], file = '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/ROSMAP_RNAseq_DLPFC_AD_MutualInfograph_percentile99.99_trad.graphml',
-#             format = "graphml")
-# 
-# write_graph(graphs_trad[[1]], file = '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/ROSMAP_RNAseq_DLPFC_noAD_MutualInfograph_percentile99.99_trad.graphml',
-#             format = "graphml")
+write_graph(graphs_trad[["graphnoAD"]], file = '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/ROSMAP_RNAseq_DLPFC_noAD_MutualInfograph_percentile99.99_trad.graphml',
+             format = "graphml")
 
 #END
