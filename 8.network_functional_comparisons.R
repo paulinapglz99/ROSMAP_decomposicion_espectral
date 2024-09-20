@@ -24,17 +24,9 @@ pacman::p_load("igraph",
 
 library("org.Hs.eg.db", character.only = TRUE)
 
-#Get data --- --- 
+#Set seed for modularity algorithm --- ---
 
-graphAD <- read_graph(file =  '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/ROSMAP_RNAseq_DLPFC_AD_MutualInfograph_percentile99.99.graphml',
-                      format = 'graphml')
-
-graphnoAD <- read_graph(file = '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/ROSMAP_RNAseq_DLPFC_noAD_MutualInfograph_percentile99.99.graphml',
-                        format = 'graphml')
-#Save graphs in a list
-
-graphLists <- list(graphAD = graphAD,
-                   graphnoAD = graphnoAD)
+set.seed(10)
 
 # Define functions --- ---
 
@@ -56,12 +48,12 @@ translate_vertex_names <- function(graph) {
   graph_vnames_trad <- convert_ens_to_symbol(graph_vnames)   # Translate names
   # Replace the missing values in the column 'external_gene_name' with the values of 'ensembl_gene_id'.
   graph_vnames_trad$external_gene_name <- ifelse(graph_vnames_trad$external_gene_name == "", graph_vnames_trad$ensembl_gene_id, graph_vnames_trad$external_gene_name)
-    # Create a vector of translated names using the dictionary
+  # Create a vector of translated names using the dictionary
   # We need to ensure that the actual names of the network are in the dictionary
   graph_vnames_trad <- setNames(graph_vnames_trad$external_gene_name, graph_vnames_trad$ensembl_gene_id)
-    # Sort graph_vnames_trad according to the order of graph_vnames
+  # Sort graph_vnames_trad according to the order of graph_vnames
   sorted_graph_vnames_trad <- graph_vnames_trad[match(graph_vnames, names(graph_vnames_trad))]
-    # Assign the new names to the network vertices.
+  # Assign the new names to the network vertices.
   V(graph)$name <- sorted_graph_vnames_trad
   return(graph)
 }
@@ -72,9 +64,17 @@ jaccard_simplex <- function(a,b){
   length(intersect(a,b))/length(union(a,b))
 }
 
-#Set seed for modularity algorithm --- ---
+#Get data --- --- 
 
-set.seed(10)
+graphAD <- read_graph(file =  '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/ROSMAP_RNAseq_DLPFC_AD_MutualInfograph_percentile99.99.graphml',
+                      format = 'graphml')
+
+graphnoAD <- read_graph(file = '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/ROSMAP_RNAseq_DLPFC_noAD_MutualInfograph_percentile99.99.graphml',
+                        format = 'graphml')
+#Save graphs in a list
+
+graphLists <- list(graphAD = graphAD,
+                   graphnoAD = graphnoAD)
 
 #Comparison of biological function sets associated to the overall network --- ---
 

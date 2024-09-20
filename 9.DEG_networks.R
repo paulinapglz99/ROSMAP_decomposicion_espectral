@@ -22,6 +22,13 @@ graph_0.degree <- data.frame(ensembl_gene_id = names(degree(graph_0)), degree_g_
 
 graph_1.degree <- data.frame(ensembl_gene_id = names(degree(graph_1)), degree_g_1 = degree(graph_1))
 
+#See if there's hub genes in the graphs
+
+table(DEGS$ensembl_gene_id %in% graph_0.degree$ensembl_gene_id)
+table(DEGS$ensembl_gene_id %in% graph_1.degree$ensembl_gene_id)
+
+#If false, there will not be induced subgraph, sorry
+
 # Left join
 
 DEGS <- DEGS %>% left_join(graph_0.degree, by = "ensembl_gene_id")

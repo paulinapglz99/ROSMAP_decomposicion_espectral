@@ -35,6 +35,26 @@ jaccard_nodes <- function(g1,g2){
   return(deLaCueva)
 }
 
+#Distribution 
+
+process_distribution <- function(degree_distribution) {
+  # Convert to data frame and count frequencies
+  distribution.df <- as.data.frame(table(degree_distribution$degree))
+  # Rename the column
+  distribution.df <- distribution.df %>% rename(degree = "Var1")
+  # Order by degree
+  distribution.df <- distribution.df[order(distribution.df$degree, decreasing = F), ]
+  # Calculate the cumulative sum
+  distribution.df$CumulativeDegree <- cumsum(distribution.df$Freq)
+  # Logarithm of the cumulative sum
+  distribution.df$logCumulativeDegree <- log10(distribution.df$CumulativeDegree)
+  # Add threshold
+  CumulativeDegree_threshold <- quantile(distribution.df$logCumulativeDegree, probs = 0.95)
+  # Puedes devolver el umbral si es necesario, por ejemplo:
+  return(list(degree_distribution = distribution.df, threshold = CumulativeDegree_threshold))
+}
+
+
 #Get data --- --- 
 
 graphAD <- read_graph(file = '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/ROSMAP_RNAseq_DLPFC_AD_MutualInfograph_percentile99.99.graphml', format = 'graphml')
@@ -115,7 +135,60 @@ degree_dis <- grid.arrange(degree_disAD, degree_disnoAD, ncol =1 )
 #       dpi = 300,
 #       )
 
-#Calculate clustering coefficient of both networks
+#Plot cummulative degree distribution --- ---
+
+#Calculate degree of nodes
+nodes_degree <- sapply(X = graphs, FUN = degree)
+
+#Table of degree distribution
+
+degree_distribution <- list()
+
+for (i in 1:length(nodes_degree)) {
+  degree_distribution[[i]] <- data.frame(gene = names(nodes_degree[[i]]), degree = nodes_degree[[i]])
+}
+
+#Calculate percentile 95 of genes with higher degree ---- ---
+
+processed_distribution <- lapply(degree_distribution, FUN = process_distribution)
+
+dis_AD <- processed_distribution[[1]]$degree_distribution
+dis_AD$dx <- "AD"
+dis_noAD <-  processed_distribution[[2]]$degree_distribution
+dis_noAD$dx<- "no AD"
+
+dis <- bind_rows(dis_AD, dis_noAD)
+
+#Plot both distributions
+dis <- bind_rows(dis_AD, dis_noAD)
+
+dis$degree <- as.numeric(dis$degree)
+
+degree_distr.p <- ggplot(dis, aes(x = degree, y = logCumulativeDegree, group = dx, color = dx)) +
+  geom_point() +
+  geom_line() +
+  geom_hline(yintercept = processed_distribution[[1]]$threshold, linetype = "dashed", color = "#291F1E", size = 0.5) +  # AD threshold
+  geom_hline(yintercept = processed_distribution[[2]]$threshold, linetype = "dashed", color = "#291F1E", size = 0.5) +   # no AD threshold
+  labs(title = "Degree Distribution",
+       x = "Degree",
+       y = "logCumulativeDegree") +
+  scale_x_continuous(breaks = seq(1, max(dis$degree))) + # Adjust the x-axis to show only integer degrees
+  scale_color_manual(values = c("AD" = "#A3333D", "no AD" = "#477998")) + # Custom colors for AD and no AD
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +  # Rotate X-axis labels at 45 degrees
+  theme_light()
+
+degree_distr.p    
+#Save plot
+
+ggsave(filename = "bothdx_cummulative_degree_distributions_coexpression_NIAReagan_histogram.png",
+      plot = degree_distr.p,
+      width = 20,
+      height = 10,
+      units = "in",
+      dpi = 300,
+      )
+
+#Calculate clustering coefficient of both networks ---- ---
 
 clustering_coefficient <- sapply(X = graphLists, FUN = transitivity)
 
@@ -147,14 +220,10 @@ noADnodes <- V(graphnoAD)
 # Find elements in noADnodes but not in ADnodes
 missing_elements_in_ADnodes <- setdiff(names(noADnodes), names(ADnodes))
 length(missing_elements_in_ADnodes)
-#[1] 296
-#[1] 383
 
 # Find elements in ADnodes but not in noADnodes
 missing_elements_in_noADnodes <- setdiff(names(ADnodes), names(noADnodes))
 length(missing_elements_in_noADnodes)
-#[1] 235
-#[1] 525
 
 #Add nodes missing to AD graph
 
@@ -169,13 +238,15 @@ graphnoAD_plus <- add_vertices(graphnoAD, nv = length(missing_elements_in_noADno
 graphLists_plus <- list(graphAD_plus = graphAD_plus, 
                         graphnoAD_plus =graphnoAD_plus)
 
+metrics_graphplus <- 
+
 #Do they have similar nodes? --- --- 
 
 #To make the topological comparison for nodes and edges we use the Jaccard index
 
 #Apply function to compare nodes
 
-NodesJaccard <- sapply(X = graphLists_plus, FUN = jaccard_nodes, g1 = graphLists_plus[[2]])
+NodesJaccard <- sapply(X = graphLists_plus, FUN = jaccard_nodes, g1 = graphLists_plus[[1]])
 NodesJaccard
 
 #graphAD graphnoAD  <-----
@@ -198,7 +269,6 @@ for (i in 1:length(graphLists)) {
   # Aplicar cluster_infomap a cada grafo y almacenar el resultado en results_list
   infomap_modularity[[i]] <- cluster_infomap(graph = graphLists[[i]], e.weights = graphLists[[i]]$mut_info_norm)
 }
-
 
 # Extract information from the modules
 
