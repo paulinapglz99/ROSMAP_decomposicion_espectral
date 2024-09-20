@@ -21,23 +21,22 @@ convert_ens_to_symbol <- function(ensembl_ids) {
 }
 
 translate_vertex_names <- function(graph) {
-  # Extract vertex names
+  #Extract vertex names
   graph_vnames <- V(graph)$name
   
-  # Translate names
+  #Translate names
   graph_vnames_trad <- convert_ens_to_symbol(graph_vnames)
   
-  # Reemplazar los valores faltantes en la columna 'external_gene_name' con los valores de 'ensembl_gene_id'
+  #Replace the missing values in the column 'external_gene_name' with the values of 'ensembl_gene_id'.
   graph_vnames_trad$external_gene_name <- ifelse(graph_vnames_trad$external_gene_name == "", graph_vnames_trad$ensembl_gene_id, graph_vnames_trad$external_gene_name)
   
   # Create a vector of translated names using the dictionary
   # We need to ensure that the actual names of the network are in the dictionary
   graph_vnames_trad <- setNames(graph_vnames_trad$external_gene_name, graph_vnames_trad$ensembl_gene_id)
   
-  # Ordena graph_vnames_trad según el orden de graph_vnames
+  # Sort graph_vnames_trad according to the order of graph_vnames
   sorted_graph_vnames_trad <- graph_vnames_trad[match(graph_vnames, names(graph_vnames_trad))]
-  
-  # Assign the new names to the network vertices.
+    #Assign the new names to the network vertices.
   V(graph)$name <- sorted_graph_vnames_trad
   
   return(graph)

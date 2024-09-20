@@ -114,10 +114,10 @@ coldata <- coldata %>%
 coldata$dicho_NIA_reagan <- as.factor(coldata$dicho_NIA_reagan)  #Convert to factor
 
 #DESeqData object
-
+#DESeqData object con control para sequencingBatch
 dds <- DESeqDataSetFromMatrix(countData = counts, 
                               colData = coldata,
-                              design = ~ dicho_NIA_reagan) #En caso unicamente de comparar diagnostico
+                              design = ~ sequencingBatch + dicho_NIA_reagan) # Control sequencing batch and compare NIA-Reagan
 
 #Differential expression analysis --- ---
 

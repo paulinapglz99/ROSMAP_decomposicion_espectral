@@ -58,11 +58,6 @@ translate_vertex_names <- function(graph) {
   return(graph)
 }
 
-#2. Jaccard Index function
-
-jaccard_simplex <- function(a,b){
-  length(intersect(a,b))/length(union(a,b))
-}
 
 #3. Create degree data frames
 
@@ -70,18 +65,23 @@ process_distribution <- function(degree_distribution) {
   # Convert to data frame and count frequencies
   distribution.df <- as.data.frame(table(degree_distribution$degree))
   # Rename the column
-  distribution.df <- distribution.df %>% rename(Var1 = "degree")
+  distribution.df <- distribution.df %>% rename(degree = "Var1")
   # Order by degree
   distribution.df <- distribution.df[order(distribution.df$degree, decreasing = F), ]
+  #Calculate mean and sd
+  dis_mean <- mean(distribution.df$degree)
+  dis_sd <- sd(distribution.df$degree)
   # Calculate the cumulative sum
   distribution.df$CumulativeDegree <- cumsum(distribution.df$Freq)
   # Logarithm of the cumulative sum
   distribution.df$logCumulativeDegree <- log10(distribution.df$CumulativeDegree)
+
   # Add threshold
-  CumulativeDegree_threshold <- quantile(distribution.df$logCumulativeDegree, probs = 0.95)
+  #simple_degree_threshold <- quantile(distribution.df$degree, probs = 0.95)
+  logCumulativeDegree_threshold <- quantile(distribution.df$logCumulativeDegree, probs = 0.95)
   # Puedes devolver el umbral si es necesario, por ejemplo:
-  return(list(degree_distribution = distribution.df, threshold = CumulativeDegree_threshold))
-  return(distribution.df)
+  return(list(degree_distribution = distribution.df, dis_mean= dis_mean,
+              dis_sd = dis_sd, CumulativeDegree_threshold = CumulativeDegree_threshold))
 }
 
 ########## HUB GENES ########## 
@@ -99,37 +99,45 @@ for (i in 1:length(nodes_degree)) {
 
 #Calculate percentile 95 of genes with higher degree ---- ---
 
-q_threshold.de <- list()
-
-for (i in 1:length(nodes_degree)) {
-  # Aplicar cluster_infomap a cada grafo y almacenar el resultado en results_list
-  q_threshold.de[[i]] <- quantile(nodes_degree[[i]], probs = 0.95)
-}
-
-#Plot degree distribution --- ---
-# Aplicar la función a cada elemento de la lista
 processed_distribution <- lapply(degree_distribution, FUN = process_distribution)
 
-# Processed distribution of both 
-processed_distribution_AD <- processed_distribution[[1]]$degree_distribution
-processed_distribution_AD$dx <- "AD"
-processed_distribution_noAD <-  processed_distribution[[2]]$degree_distribution
-processed_distribution_noAD$dx<- "no AD"
+#Plot cummulative degree distribution --- ---
+
+dis_AD <- processed_distribution[[1]]$degree_distribution
+dis_AD$dx <- "AD"
+dis_noAD <-  processed_distribution[[2]]$degree_distribution
+dis_noAD$dx<- "no AD"
+
+dis <- bind_rows(dis_AD, dis_noAD)
+dis$degree <- as.numeric(dis$degree)
 
 #Plot both distributions
 
-degree_distr.p <- ggplot(d_distribution, aes(x = degree, y = logCumulativeDegree, group = dx, color = dx)) +
+degree_distr.p <- ggplot(dis, aes(x = degree, y = logCumulativeDegree, group = dx, color = dx)) +
   geom_point() +
   geom_line() +
+  geom_hline(yintercept = processed_distribution[[1]]$threshold, linetype = "dashed", color = "#291F1E", size = 0.5) +  # AD threshold
+  geom_hline(yintercept = processed_distribution[[2]]$threshold, linetype = "dashed", color = "#291F1E", size = 0.5) +   # no AD threshold
   labs(title = "Degree Distribution",
        x = "Degree",
        y = "logCumulativeDegree") +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +  # Rotar los nombres del eje X
-    theme_light()
-    
+  scale_x_continuous(breaks = seq(1, max(dis$degree))) + # Adjust the x-axis to show only integer degrees
+  scale_color_manual(values = c("AD" = "#A3333D", "no AD" = "#477998")) + # Custom colors for AD and no AD
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +  # Rotate X-axis labels at 45 degrees
+  theme_light()
+
+degree_distr.p    
+
 #Save plot 
 
-ggsave("d_distribution.png", plot = degree_distr.p, width = 10, height = 4, units = "in", dpi = 300)
+ggsave("d_distribution.png", plot = degree_distr.p, width = 15,
+       height = 4, units = "in", dpi = 300)
+
+#So, hub genes are
+
+hub_AD <- dis_AD %>% filter(processed_distribution[[1]]$threshold)
+
+####### HIGH BETWEENESS GENES #######
 
 
 
