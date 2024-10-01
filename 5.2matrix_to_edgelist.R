@@ -16,6 +16,16 @@ dim(matrix)
 
 matrix <- as.data.frame(matrix)
 
+#Extract universe of genes
+
+universe <- colnames(matrix)
+length(universe)
+
+#Save genes
+
+write(universe,
+        file = '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/universe.txt')
+
 #Pivot  ----
 
 #this gives a table of connections between genes (edgelist), needed for the three approaches

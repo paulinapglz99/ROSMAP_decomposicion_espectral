@@ -12,8 +12,7 @@ pacman::p_load("tidyverse",
 #Read Mutual information matrix in rds format
 
 #slow
-mi_list <- readRDS("/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/MI_matrices_NIA_Reagan/ROSMAP_DLFPC_RNAseq_MutualInfo_AD_NIA_Reagan_dicho.rds")
-
+mi_list <- readRDS("/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/networks/ROSMAP_DLFPC_RNAseq_MutualInfo_AD_NIA_Reagan_dicho.rds")
 #Unnest RDS --- ---
 
 rows <- names(mi_list)
@@ -34,9 +33,9 @@ coexpre_mat <- as.matrix(coexpre_mat)
 
 #If the diagonal of the matrix does not have the same values, we must verify
 #that at least the elements in the diagonal are the highest values of the columns.
-
-IM_test <- coexpre_mat[, 5] %>% as.data.frame() #place the column you want to test in the brackets [,n].
-max(IM_test) #max number must be the diagonal value
+# 
+# IM_test <- coexpre_mat[, 5] %>% as.data.frame() #place the column you want to test in the brackets [,n].
+# max(IM_test) #max number must be the diagonal value
 
 #Keep only the upper triangle of the matrix to avoid double information and double-edged matrices. 
 

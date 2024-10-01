@@ -123,7 +123,7 @@ plot(hub_subgraph)
 
 #Save graph 
 
-write_graph(graph_AD[["graphAD"]], file = '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/ROSMAP_RNAseq_DLPFC_AD_MutualInfograph_percentile99.99_trad.graphml',
+write_graph(hub_subgraph, file = '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/ROSMAP_RNAseq_DLPFC_AD_hubs_induced_subgraph.graphml',
              format = "graphml")
 
 ##### HIGH BETWEENESS GENES ####
@@ -181,6 +181,11 @@ highbeb_subgraph <- induced_subgraph(graph = graphAD,
 
 plot(highbeb_subgraph)
 
+#Save graph
+
+write_graph(hub_subgraph, file = '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/ROSMAP_RNAseq_DLPFC_AD_highbe_induced_subgraph.graphml',
+            format = "graphml")
+
 #NEXT QUESTION IS What modules do these genes belong to? --- ---
 
 #Save hub genes to explore them in the partitions
@@ -191,6 +196,6 @@ write(AD_hubs_notcontrol,
 #Save high betweeness genes to explore them in the partitions
 
 write(AD_highbe_notcontrol,
-      file = '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/AD_hubs_notcontrol_ens.txt')
+      file = '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/AD_highbe_notcontrol_ens.txt')
 
 #END

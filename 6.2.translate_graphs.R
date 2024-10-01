@@ -37,7 +37,7 @@ translate_vertex_names <- function(graph) {
   # Sort graph_vnames_trad according to the order of graph_vnames
   sorted_graph_vnames_trad <- graph_vnames_trad[match(graph_vnames, names(graph_vnames_trad))]
     #Assign the new names to the network vertices.
-  V(graph)$name <- sorted_graph_vnames_trad
+  V(graph)$name_trad <- sorted_graph_vnames_trad
   
   return(graph)
 }

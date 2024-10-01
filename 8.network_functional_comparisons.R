@@ -71,6 +71,9 @@ graphAD <- read_graph(file =  '/datos/rosmap/data_by_counts/ROSMAP_counts/counts
 
 graphnoAD <- read_graph(file = '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/ROSMAP_RNAseq_DLPFC_noAD_MutualInfograph_percentile99.99.graphml',
                         format = 'graphml')
+
+universe <- scan(file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/universe.txt", what = character())
+
 #Save graphs in a list
 
 graphLists <- list(graphAD = graphAD,
@@ -86,6 +89,7 @@ enrichment_fullnet_AD <- enrichGO(gene = V(graphAD)$name,
                                   OrgDb = "org.Hs.eg.db", 
                                   keyType = 'ENSEMBL',
                                   readable = TRUE,
+                                  universe = universe, 
                                   ont = "BP",          #type of GO(Biological Process (BP), cellular Component (CC), Molecular Function (MF)
                                   pvalueCutoff = 0.05, 
                                   qvalueCutoff = 0.10)
@@ -108,6 +112,7 @@ enrichment_fullnet_noAD <- enrichGO(gene = V(graphnoAD)$name,
                                     OrgDb = "org.Hs.eg.db", 
                                     keyType = 'ENSEMBL',
                                     readable = TRUE,
+                                    universe = universe, 
                                     ont = "BP",          #type of GO(Biological Process (BP), cellular Component (CC), Molecular Function (MF)
                                     pvalueCutoff = 0.05, 
                                     qvalueCutoff = 0.10)
@@ -130,11 +135,11 @@ OverallEnrichedProcessJ <- jaccard_simplex(names(enrichment_fullnet_AD@geneSets)
 
 #Modularity algorithm 
 
-modularity <- sapply(X = graphLists, FUN = cluster_infomap)
+modularities <- sapply(X = graphLists, FUN = cluster_infomap)
 
 #Calculate Q score 
 
-Qscore <- sapply(modularity, FUN = modularity)
+Qscore <- sapply(modularities, FUN = modularity)
 
 #Calculate clustering coefficient
 
@@ -142,7 +147,7 @@ clus_coe <- sapply(graphLists, FUN = transitivity)
 
 #Split lists of nodes by module
 
-nodes_membership <- sapply(modularity, FUN = membership)
+nodes_membership <- sapply(modularities, FUN = membership)
 
 #Create df
 nodes_membership_AD.df <- data.frame(ensembl_gene_id = names(nodes_membership$graphAD),  membership = nodes_membership$graphAD)
@@ -152,6 +157,18 @@ nodes_membership_noAD.df <- data.frame(ensembl_gene_id = names(nodes_membership$
 # Assign membership to the nodes of each network
 for (i in seq_along(graphLists)) {
   V(graphLists[[i]])$community <- nodes_membership[[i]]
+}
+
+#Save graphs  --- ----
+
+# Loop through each graph and export it with community membership as GraphML
+for (i in seq_along(graphLists)) {
+  # Generate filename for each graph (e.g., graphAD.graphml, graphnoAD.graphml)
+  graph_name <- ifelse(i == 1, "graphAD", "graphnoAD")
+  filename <- paste0(graph_name, "nodes_membership.graphml")
+  
+  # Export graph to GraphML format
+  write_graph(graphLists[[i]], file = filename, format = "graphml")
 }
 
 # Extract list of nodes by community for each graph
@@ -164,7 +181,7 @@ nodes_by_community_list <- lapply(seq_along(nodes_membership), function(i) {
 
 #Get hub genes 
 
-hub_genes <- scan("/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/genes_en_AD_no_noAD_ens.txt",  what = character())
+hub_genes <- scan("/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/AD_hubs_notcontrolens.txt",  what = character())
 
 hub_genes.x <- nodes_membership_AD.df %>% filter(ensembl_gene_id %in% hub_genes)
 
@@ -182,37 +199,7 @@ high_be_genes.xy <- convert_ens_to_symbol(high_be_genes.x)
 
 high_be_genes.x <- high_be_genes.x %>% left_join(high_be_genes.xy, by ="ensembl_gene_id")
 
-#Export to see graphs in cytoscape --- ---
-
-#Translate them first 
-
-graphAD_trad <- V(graphLists[["graphAD"]])$name
-graphAD_trad <- convert_ens_to_symbol(graphAD_trad)
-graphAD_trad$external_gene_name <-  ifelse(graphAD_trad$external_gene_name == "", graphAD_trad$ensembl_gene_id, graphAD_trad$external_gene_name)
-graphAD_trad <- setNames(graphAD_trad$external_gene_name, graphAD_trad$ensembl_gene_id)
-
-sorted_graphAD_trad <- graphAD_trad[match(V(graphLists[["graphAD"]])$name, names(graphAD_trad))]
-V(graphLists[["graphAD"]])$name <- sorted_graphAD_trad
-
-#Save graph
-
-write_graph(graphLists[["graphAD"]], file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/ROSMAP_RNAseq_DLPFC_AD_MutualInfograph_percentile99.99_infomap.graphml", 
-            format = "graphml")
-
-#Translate again 
-
-graphnoAD_trad <- V(graphLists[["graphnoAD"]])$name
-graphnoAD_trad <- convert_ens_to_symbol(graphnoAD_trad)
-graphnoAD_trad$external_gene_name <-  ifelse(graphAD_trad$external_gene_name == "", graphAD_trad$ensembl_gene_id, graphAD_trad$external_gene_name)
-graphnoAD_trad <- setNames(graphAD_trad$external_gene_name, graphAD_trad$ensembl_gene_id)
-
-sorted_graphAD_trad <- graphAD_trad[match(V(graphLists[["graphAD"]])$name, names(graphAD_trad))]
-V(graphLists[["graphAD"]])$name <- sorted_graphAD_trad
-
-#Save graph
-
-write_graph(graphLists[["graphnoAD"]], file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/ROSMAP_RNAseq_DLPFC_noAD_MutualInfograph_percentile99.99_infomap.graphml",
-            format = "graphml")
+#Enrichment to all modules of a network --- ----
 
 #I'd like to add names to lists of graphs again
 
@@ -225,13 +212,12 @@ nodes_by_community_AD <- nodes_by_community_list[["graphAD"]]
 
 nodes_by_community_noAD <- nodes_by_community_list[["graphnoAD"]]
 
-#Enrichment to all modules of a network --- ---
-
 #Define function that performs enrichment
 
 enricher <- function(nodes_by_community) {
   enrichGO_result <- enrichGO(gene = nodes_by_community,
                               OrgDb = org.Hs.eg.db, 
+                              universe = universe , 
                               keyType = 'ENSEMBL',
                               readable = TRUE,
                               ont = "BP",          #type of GO(Biological Process (BP), cellular Component (CC), Molecular Function (MF)
@@ -324,6 +310,44 @@ dim(num_equal_nodes.x)
 
 #3.In how many modules is represented each biological process?
 
+# Define a function to extract the biological processes (GO terms) from an enrichment result
+extract_bp_terms <- function(enrich_result) {
+  if (is.null(enrich_result@result)) return(character(0)) # Handle empty enrichment results
+  bp_terms <- enrich_result@result$Description # Extract Biological Process (BP) terms
+  return(bp_terms)
+}
+
+# Combine both AD and noAD enrichment results
+combined_enrichment_results <- c(enriched_results_AD, enriched_results_noAD)
+
+# Create a list to store the modules for each biological process
+biological_process_modules <- list()
+
+# Loop through each module's enrichment result
+for (i in seq_along(combined_enrichment_results)) {
+  # Extract the biological process terms for the current module
+  bp_terms <- extract_bp_terms(combined_enrichment_results[[i]])
+  
+  # Count the occurrence of each biological process and track the module it appears in
+  for (bp in bp_terms) {
+    if (!is.null(biological_process_modules[[bp]])) {
+      biological_process_modules[[bp]]$modules <- c(biological_process_modules[[bp]]$modules, i)
+      biological_process_modules[[bp]]$count <- biological_process_modules[[bp]]$count + 1
+    } else {
+      biological_process_modules[[bp]] <- list(modules = i, count = 1)
+    }
+  }
+}
+
+# Convert the result to a data frame for easier viewing
+biological_process_summary <- data.frame(
+  Biological_Process = names(biological_process_modules),
+  Module_Count = sapply(biological_process_modules, function(x) x$count),
+  Modules = sapply(biological_process_modules, function(x) paste(x$modules, collapse = ", "))
+)
+
+# Display the result
+print(biological_process_summary)
 
 
 

@@ -25,71 +25,11 @@ graphnoAD <- read_graph(file = '/datos/rosmap/data_by_counts/ROSMAP_counts/count
 graphs <- list(graphAD = graphAD, 
                graphnoAD = graphnoAD)
 
-#Define function to convert gene names --- ---
-
-# Connecting to the Ensembl database through biomaRt
-ensembl <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
-
-# Define function to convert from ENSMBL to SYMBOL
-convert_ens_to_symbol <- function(ensembl_ids) {
-  getBM(attributes = c("ensembl_gene_id", "external_gene_name", "chromosome_name"),
-        filters = "ensembl_gene_id",
-        values = ensembl_ids,
-        mart = ensembl)
-}
-
-# Define function to change names of vertex for symbol names --- ---
-
-translate_vertex_names <- function(graph) {
-  # Extract vertex names
-  graph_vnames <- V(graph)$name
-  # Translate names
-  graph_vnames_trad <- convert_ens_to_symbol(graph_vnames)
-  # Reemplazar los valores faltantes en la columna 'external_gene_name' con los valores de 'ensembl_gene_id'
-  graph_vnames_trad$external_gene_name <- ifelse(graph_vnames_trad$external_gene_name == "", graph_vnames_trad$ensembl_gene_id, graph_vnames_trad$external_gene_name)
-  # Create a vector of translated names using the dictionary
-  # We need to ensure that the actual names of the network are in the dictionary
-  graph_vnames_trad <- setNames(graph_vnames_trad$external_gene_name, graph_vnames_trad$ensembl_gene_id)
-  # Ordena graph_vnames_trad según el orden de graph_vnames
-  sorted_graph_vnames_trad <- graph_vnames_trad[match(graph_vnames, names(graph_vnames_trad))]
-    # Assign the new names to the network vertices.
-  V(graph)$name <- sorted_graph_vnames_trad
-  return(graph)
-}
-
 #Define similarity of Enriched Processes, Jaccard Index function --- ---
 
 jaccard_simplex <- function(a,b){
   length(intersect(a,b))/length(union(a,b))
 }
-
-##Change names of vertex from both graphs --- ---
-# 
-# # Extract vertex names
-# 
-# graphAD_vnames <- V(graphAD)$name
-# length(graphAD_vnames)
-# 
-# #Translate names
-# 
-# graphAD_vnames_trad <-convert_ens_to_symbol(graphAD_vnames)
-# 
-# # Reemplazar los valores faltantes en la columna 'external_gene_name' con los valores de 'ensembl_gene_id'
-# graphAD_vnames_trad <- graphAD_vnames_trad %>%
-#   mutate(external_gene_name = ifelse(external_gene_name == "", ensembl_gene_id, external_gene_name))
-# 
-# # Create a vector of translated names using the dictionary
-# # We need to ensure that the actual names of the network are in the dictionary
-# 
-# graphAD_vnames_trad <- setNames(graphAD_vnames_trad$external_gene_name, graphAD_vnames_trad$ensembl_gene_id)
-# 
-# # Ordena graphAD_vnames_trad según el orden de graphAD_vnames
-# sorted_graphAD_vnames_trad <- graphAD_vnames_trad[match(graphAD_vnames, names(graphAD_vnames_trad))]
-# identical(names(sorted_graphAD_vnames_trad), graphAD_vnames)#must say true
-# 
-# # Assign the new names to the network vertices.
-# 
-# V(graphAD)$name <- sorted_graphAD_vnames_trad
 
 #Identify hub genes --- ---
 

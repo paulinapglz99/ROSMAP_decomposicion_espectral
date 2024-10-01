@@ -59,8 +59,6 @@ dim(AD_cogdx)
 
 #Read counts data --- ---
 
-#Finally, save counts table --- ---
-
 counts <- readRDS(file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/full_counts/ROSMAP_RNAseq_filteredQC_counts_DLPFC.rds")
 dim(counts) 
 

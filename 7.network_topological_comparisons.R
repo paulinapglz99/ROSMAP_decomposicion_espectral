@@ -7,11 +7,12 @@
 #Part of code adapted from https://github.com/guillermodeandajauregui/BiologicalModuleComparison/blob/master/comparisonParameters.R
 
 #Libraries --- ---
-
+install.packages("svglite")
 pacman::p_load("igraph", 
                "ggraph",
                "tidyverse", 
-               "gridExtra")
+               "gridExtra", 
+               "svglite")
 
 #Set seed --- --- 
 
@@ -27,13 +28,13 @@ jaccard_edges <- function(g1, g2){
 
 #Declare function that compares nodes
 
-jaccard_nodes <- function(g1,g2){
-  a = sort(vertex.attributes(graph = g1)[["name"]])
-  b = sort(vertex.attributes(graph = g2)[["name"]])
-  
-  deLaCueva = length(intersect(a,b))/length(union(a,b))
-  return(deLaCueva)
-}
+# #jaccard_nodes <- function(g1,g2){
+#   a = sort(vertex.attributes(graph = g1)[["name"]])
+#   b = sort(vertex.attributes(graph = g2)[["name"]])
+#   
+#   deLaCueva = length(intersect(a,b))/length(union(a,b))
+#   return(deLaCueva)
+# }
 
 #Distribution 
 
@@ -63,7 +64,7 @@ graphnoAD <- read_graph(file = '/datos/rosmap/data_by_counts/ROSMAP_counts/count
 
 #Save graphs in a list
 
-graphLists = list(graphAD = graphAD,
+graphLists <- list(graphAD = graphAD,
                   graphnoAD = graphnoAD)
 
 #Network topological comparison --- --- 
@@ -78,18 +79,24 @@ degree_distributions <- sapply(X = graphLists, FUN = degree)
 ADdegree <- degree_distributions[["graphAD"]]
 ADdegree.df <- data.frame(gene = names(ADdegree), degree = ADdegree)
 ADdegree_freq <- table(ADdegree.df$degree) %>% as.data.frame()
+colnames(ADdegree_freq) <- c("degree", "Freq")
+ADdegree_freq$degree <- as.numeric(as.character(ADdegree_freq$degree))
+ADdegree_freq$Prob <- ADdegree_freq$Freq / sum(ADdegree_freq$Freq) # Frecuencia relativa
 
 noADdegree <- degree_distributions[["graphnoAD"]]
 noADdegree.df <- data.frame(gene = names(noADdegree), degree = noADdegree)
 noADdegree_freq <- table(noADdegree.df$degree) %>% as.data.frame()
+colnames(noADdegree_freq) <- c("degree", "Freq")
+noADdegree_freq$degree <- as.numeric(as.character(noADdegree_freq$degree))
+noADdegree_freq$Prob <- noADdegree_freq$Freq / sum(noADdegree_freq$Freq) # Frecuencia relativa
 
 # Find the max value of "Freq" in both networks
 max_freq_AD <- max(ADdegree_freq$Freq)
 max_freq_noAD <- max(noADdegree_freq$Freq)
 
 # Find max degree value in both graphs 
-max_degree_AD <- max(as.numeric(as.character(ADdegree_freq$Var1)))
-max_degree_noAD <- max(as.numeric(as.character(noADdegree_freq$Var1)))
+max_degree_AD <- max(as.numeric(as.character(ADdegree_freq$degree)))
+max_degree_noAD <- max(as.numeric(as.character(noADdegree_freq$degree)))
 
 # Define limits for make histograms comparable
 max_y <- max(max_freq_AD, max_freq_noAD)
@@ -135,10 +142,33 @@ degree_dis <- grid.arrange(degree_disAD, degree_disnoAD, ncol =1 )
 #       dpi = 300,
 #       )
 
+#Other plot
+
+# Realiza la gráfica en escala log-log
+log_log_AD <- ggplot(ADdegree_freq, aes(x = degree, y = Prob)) +
+  geom_point(color = "blue") +
+  scale_x_log10() +   # Escala logarítmica para eje x
+  scale_y_log10() +   # Escala logarítmica para eje y
+  labs(x = "Grado k", y = "p(k)", title = "Distribución de grado en red AD") +
+  geom_smooth(method = "lm", se = FALSE, color = "black", linetype = "solid",
+              formula = y ~ x) + # Ajuste lineal en escala log-log
+  theme_minimal()
+
+log_log_noAD <- ggplot(noADdegree_freq, aes(x = degree, y = Prob)) +
+  geom_point(color = "blue") +
+  scale_x_log10() +   # Escala logarítmica para eje x
+  scale_y_log10() +   # Escala logarítmica para eje y
+  labs(x = "Grado k", y = "p(k)", title = "Distribución de grado en red no AD") +
+  geom_smooth(method = "lm", se = FALSE, color = "black", linetype = "solid",
+              formula = y ~ x) + # Ajuste lineal en escala log-log
+  theme_minimal()
+
+degree_dis_loglog <- grid.arrange(log_log_AD, log_log_noAD, ncol =2)
+
 #Plot cummulative degree distribution --- ---
 
 #Calculate degree of nodes
-nodes_degree <- sapply(X = graphs, FUN = degree)
+nodes_degree <- sapply(X = graphLists, FUN = degree)
 
 #Table of degree distribution
 
@@ -172,10 +202,10 @@ degree_distr.p <- ggplot(dis, aes(x = degree, y = logCumulativeDegree, group = d
   labs(title = "Degree Distribution",
        x = "Degree",
        y = "logCumulativeDegree") +
-  scale_x_continuous(breaks = seq(1, max(dis$degree))) + # Adjust the x-axis to show only integer degrees
+  scale_x_continuous(breaks = seq(1, max(dis$degree), by =4)) + # Adjust the x-axis to show only integer degrees
   scale_color_manual(values = c("AD" = "#A3333D", "no AD" = "#477998")) + # Custom colors for AD and no AD
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +  # Rotate X-axis labels at 45 degrees
-  theme_light()
+  theme_minimal()
 
 degree_distr.p    
 #Save plot
@@ -187,6 +217,37 @@ ggsave(filename = "bothdx_cummulative_degree_distributions_coexpression_NIAReaga
       units = "in",
       dpi = 300,
       )
+
+#Save grid
+
+layout_matrix <- rbind(c(1, 2),
+                       c(1, 3))
+
+# Open the SVG device
+svg("AD_grid_plot.svg", width = 10, height = 8)  # You can adjust the width and height to your needs
+
+grid.arrange(degree_distr.p, degree_disAD, degree_disnoAD, layout_matrix = layout_matrix)
+
+# Close the device
+dev.off()
+
+#Adjust the power-law distribution with poweRlaw: --- ---
+
+# Convertir los grados a un objeto de la clase 'displ' para ajustar una distribución power-law
+pl_model <- displ$new(degree_distribution)
+
+
+
+#Calculate diameter of both graphs --- --- 
+
+diameter <- sapply(X = graphLists, FUN = diameter)
+
+# graphAD graphnoAD 
+# 17        24 
+
+#Eigenvector centrality of the network --- ---
+
+eigen <- sapply(graphLists, FUN = eigen_centrality)
 
 #Calculate clustering coefficient of both networks ---- ---
 
@@ -238,7 +299,6 @@ graphnoAD_plus <- add_vertices(graphnoAD, nv = length(missing_elements_in_noADno
 graphLists_plus <- list(graphAD_plus = graphAD_plus, 
                         graphnoAD_plus =graphnoAD_plus)
 
-metrics_graphplus <- 
 
 #Do they have similar nodes? --- --- 
 
