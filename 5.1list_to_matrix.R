@@ -12,7 +12,14 @@ pacman::p_load("tidyverse",
 #Read Mutual information matrix in rds format
 
 #slow
-mi_list <- readRDS("/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/networks/ROSMAP_DLFPC_RNAseq_MutualInfo_AD_NIA_Reagan_dicho.rds")
+
+#mi_list <- readRDS("/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/networks/ROSMAP_DLFPC_RNAseq_MutualInfo_AD_NIA_Reagan_dicho.rds")
+
+args <- commandArgs(trailingOnly = TRUE)
+
+mi_list <- args[1]
+mi_list <- readRDS(mi_list)
+
 #Unnest RDS --- ---
 
 rows <- names(mi_list)
@@ -44,5 +51,5 @@ coexpre_mat[lower.tri(coexpre_mat, diag = TRUE)] <- NA
 #Save matrix --- ---
 
 saveRDS(coexpre_mat,
-        file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/MI_matrices_NIA_Reagan/ROSMAP_DLFPC_RNAseq_MutualInfo_AD_NIA_Reagan_dicho.rds")
+        file = args[1])
 #END

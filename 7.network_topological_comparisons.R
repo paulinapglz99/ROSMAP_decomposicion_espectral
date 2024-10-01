@@ -12,7 +12,8 @@ pacman::p_load("igraph",
                "ggraph",
                "tidyverse", 
                "gridExtra", 
-               "svglite")
+               "svglite", 
+               "tidygraph")
 
 #Set seed --- --- 
 
@@ -66,6 +67,24 @@ graphnoAD <- read_graph(file = '/datos/rosmap/data_by_counts/ROSMAP_counts/count
 
 graphLists <- list(graphAD = graphAD,
                   graphnoAD = graphnoAD)
+
+graphLists_tbl <- sapply(graphLists, as_tbl_graph)
+
+#Plot graphs --- ---
+
+# Plot graphAD
+graphAD.p <-ggraph(graphLists_tbl[[1]], layout = 'kk') + 
+  geom_edge_link(aes(edge_alpha = ..index..), show.legend = FALSE) + 
+  geom_node_point(color = 'blue', size = 3) + 
+  theme_void() + 
+  ggtitle("AD")
+
+# Plot graphnoAD
+ggraph(graphLists_tbl[[2]], layout = '') + 
+  geom_edge_link(aes(edge_alpha = ..index..), show.legend = FALSE) + 
+  geom_node_point(color = 'red', size = 3) + 
+  theme_void() + 
+  ggtitle("noAD")
 
 #Network topological comparison --- --- 
 
@@ -146,24 +165,49 @@ degree_dis <- grid.arrange(degree_disAD, degree_disnoAD, ncol =1 )
 
 # Realiza la gráfica en escala log-log
 log_log_AD <- ggplot(ADdegree_freq, aes(x = degree, y = Prob)) +
-  geom_point(color = "blue") +
-  scale_x_log10() +   # Escala logarítmica para eje x
-  scale_y_log10() +   # Escala logarítmica para eje y
-  labs(x = "Grado k", y = "p(k)", title = "Distribución de grado en red AD") +
-  geom_smooth(method = "lm", se = FALSE, color = "black", linetype = "solid",
-              formula = y ~ x) + # Ajuste lineal en escala log-log
-  theme_minimal()
+  geom_point(color = "blue", size = 2, alpha = 0.8) +  # Puntos más grandes y semitransparentes
+  scale_x_log10() +  # Escala logarítmica en el eje x
+  scale_y_log10() +  # Escala logarítmica en el eje y
+  labs(x = expression("<k>"), y = expression(p(k)), 
+       title = "", 
+       subtitle = "AD network \ndegree distribution") +
+  geom_smooth(method = "lm", se = FALSE, color = "black", linetype = "dashed", 
+              size = 1.2, formula = y ~ x) +  # Ajuste lineal con estilo modificado
+  theme_minimal(base_size = 14) +  # Tamaño base de texto para mejor legibilidad
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),  # Centrar título y agrandar
+    axis.title = element_text(size = 14),  # Tamaño de títulos de ejes
+    axis.text = element_text(size = 12),   # Tamaño de etiquetas de ejes
+    panel.grid = element_line(size = 0.5, color = "grey80")  # Líneas de cuadrícula más sutiles
+  )
 
-log_log_noAD <- ggplot(noADdegree_freq, aes(x = degree, y = Prob)) +
-  geom_point(color = "blue") +
-  scale_x_log10() +   # Escala logarítmica para eje x
-  scale_y_log10() +   # Escala logarítmica para eje y
-  labs(x = "Grado k", y = "p(k)", title = "Distribución de grado en red no AD") +
-  geom_smooth(method = "lm", se = FALSE, color = "black", linetype = "solid",
-              formula = y ~ x) + # Ajuste lineal en escala log-log
-  theme_minimal()
 
-degree_dis_loglog <- grid.arrange(log_log_AD, log_log_noAD, ncol =2)
+log_log_noAD <-  ggplot(noADdegree_freq, aes(x = degree, y = Prob)) +
+  geom_point(color = "blue", size = 2, alpha = 0.8) +  # Puntos más grandes y semitransparentes
+  scale_x_log10() +  # Escala logarítmica en el eje x
+  scale_y_log10() +  # Escala logarítmica en el eje y
+  labs(x = expression("<k>"), y = expression(p(k)), 
+       title = "", 
+       subtitle = "No AD network \ndegree distribution") +
+  geom_smooth(method = "lm", se = FALSE, color = "black", linetype = "dashed", 
+              size = 1.2, formula = y ~ x) +  # Ajuste lineal con estilo modificado
+  theme_minimal(base_size = 14) +  # Tamaño base de texto para mejor legibilidad
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),  # Centrar título y agrandar
+    axis.title = element_text(size = 14),  # Tamaño de títulos de ejes
+    axis.text = element_text(size = 12),   # Tamaño de etiquetas de ejes
+    panel.grid = element_line(size = 0.5, color = "grey80")  # Líneas de cuadrícula más sutiles
+  )
+
+log_grid <- grid.arrange(log_log_AD, log_log_noAD, ncol =2)
+
+ggsave(filename = "degree_dis_loglog.jpg",
+      plot = log_grid,
+      width = 25,
+      height = 25,
+      units = "cm",
+      dpi = 300,
+      )
 
 #Plot cummulative degree distribution --- ---
 
@@ -193,6 +237,7 @@ dis <- bind_rows(dis_AD, dis_noAD)
 dis <- bind_rows(dis_AD, dis_noAD)
 
 dis$degree <- as.numeric(dis$degree)
+dis <- dis[order(dis$degree), ]
 
 degree_distr.p <- ggplot(dis, aes(x = degree, y = logCumulativeDegree, group = dx, color = dx)) +
   geom_point() +
@@ -235,8 +280,6 @@ dev.off()
 
 # Convertir los grados a un objeto de la clase 'displ' para ajustar una distribución power-law
 pl_model <- displ$new(degree_distribution)
-
-
 
 #Calculate diameter of both graphs --- --- 
 
