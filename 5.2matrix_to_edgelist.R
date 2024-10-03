@@ -10,8 +10,15 @@ pacman::p_load('tidyverse',
 
 #Read adjacency matrix --- ---
 
+args <- commandArgs(trailingOnly = TRUE)
+
 #This matrix may be very heavy
-matrix <- readRDS("/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/MI_matrices_NIA_Reagan/ROSMAP_DLFPC_RNAseq_MutualInfo_AD_NIA_Reagan_dicho.rds")
+matrix <- args[1]
+matrix <- readRDS(matrix)
+
+output <- args[2]
+
+#matrix <- readRDS("/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/MI_matrices_NIA_Reagan/ROSMAP_DLFPC_RNAseq_MutualInfo_AD_NIA_Reagan_dicho.rds")
 dim(matrix)
 
 matrix <- as.data.frame(matrix)
@@ -49,6 +56,7 @@ dim(full_edgelist)
 
 #save edgelist for later
 
-saveRDS(full_edgelist, file = '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/MI_matrices_NIA_Reagan/ROSMAP_DLFPC_RNAseq_MutualInfo_AD_NIA_Reagan_dicho_edgelist.rds')
+#saveRDS(full_edgelist, file = '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/MI_matrices_NIA_Reagan/ROSMAP_DLFPC_RNAseq_MutualInfo_AD_NIA_Reagan_dicho_edgelist.rds')
+saveRDS(full_edgelist, file = output)
 
 #END

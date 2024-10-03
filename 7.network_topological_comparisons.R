@@ -53,7 +53,7 @@ process_distribution <- function(degree_distribution) {
   # Add threshold
   CumulativeDegree_threshold <- quantile(distribution.df$logCumulativeDegree, probs = 0.95)
   # Puedes devolver el umbral si es necesario, por ejemplo:
-  return(list(degree_distribution = distribution.df, threshold = CumulativeDegree_threshold))
+  return(list(degree_distribution = distribution.df, cumm_threshold = CumulativeDegree_threshold))
 }
 
 
@@ -67,24 +67,6 @@ graphnoAD <- read_graph(file = '/datos/rosmap/data_by_counts/ROSMAP_counts/count
 
 graphLists <- list(graphAD = graphAD,
                   graphnoAD = graphnoAD)
-
-graphLists_tbl <- sapply(graphLists, as_tbl_graph)
-
-#Plot graphs --- ---
-
-# Plot graphAD
-graphAD.p <-ggraph(graphLists_tbl[[1]], layout = 'kk') + 
-  geom_edge_link(aes(edge_alpha = ..index..), show.legend = FALSE) + 
-  geom_node_point(color = 'blue', size = 3) + 
-  theme_void() + 
-  ggtitle("AD")
-
-# Plot graphnoAD
-ggraph(graphLists_tbl[[2]], layout = '') + 
-  geom_edge_link(aes(edge_alpha = ..index..), show.legend = FALSE) + 
-  geom_node_point(color = 'red', size = 3) + 
-  theme_void() + 
-  ggtitle("noAD")
 
 #Network topological comparison --- --- 
 
@@ -215,7 +197,7 @@ ggsave(filename = "degree_dis_loglog.jpg",
 nodes_degree <- sapply(X = graphLists, FUN = degree)
 
 #Table of degree distribution
-
+degree_distributions
 degree_distribution <- list()
 
 for (i in 1:length(nodes_degree)) {
@@ -231,28 +213,65 @@ dis_AD$dx <- "AD"
 dis_noAD <-  processed_distribution[[2]]$degree_distribution
 dis_noAD$dx<- "no AD"
 
-dis <- bind_rows(dis_AD, dis_noAD)
-
-#Plot both distributions
-dis <- bind_rows(dis_AD, dis_noAD)
+dis <- rbind(dis_AD, dis_noAD)
 
 dis$degree <- as.numeric(dis$degree)
-dis <- dis[order(dis$degree), ]
 
-degree_distr.p <- ggplot(dis, aes(x = degree, y = logCumulativeDegree, group = dx, color = dx)) +
+degree_distr.p <- ggplot(dis, aes(x = as.factor(degree), y = log(dis$CumulativeDegree), group = dx, color = dx)) +
   geom_point() +
   geom_line() +
-  geom_hline(yintercept = processed_distribution[[1]]$threshold, linetype = "dashed", color = "#291F1E", size = 0.5) +  # AD threshold
-  geom_hline(yintercept = processed_distribution[[2]]$threshold, linetype = "dashed", color = "#291F1E", size = 0.5) +   # no AD threshold
+  # geom_hline(yintercept = processed_distribution[[1]]$threshold, linetype = "dashed", color = "#291F1E", size = 0.5) +  # AD threshold
+  # geom_hline(yintercept = processed_distribution[[2]]$threshold, linetype = "dashed", color = "#291F1E", size = 0.5) +   # no AD threshold
   labs(title = "Degree Distribution",
        x = "Degree",
        y = "logCumulativeDegree") +
-  scale_x_continuous(breaks = seq(1, max(dis$degree), by =4)) + # Adjust the x-axis to show only integer degrees
+  #scale_x_continuous(breaks = seq(1, max(dis$degree), by =4)) + # Adjust the x-axis to show only integer degrees
   scale_color_manual(values = c("AD" = "#A3333D", "no AD" = "#477998")) + # Custom colors for AD and no AD
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +  # Rotate X-axis labels at 45 degrees
   theme_minimal()
 
 degree_distr.p    
+
+
+degree_dis_AD.p <- ggplot(dis_AD, aes(x = degree, y = log(dis_AD$CumulativeDegree), group = dx, color = dx)) +
+  geom_point() +
+  geom_line() +
+  #geom_hline(yintercept = processed_distribution[[1]]$threshold, linetype = "dashed", color = "#291F1E", size = 0.5) +  # AD threshold
+  #geom_hline(yintercept = processed_distribution[[2]]$threshold, linetype = "dashed", color = "#291F1E", size = 0.5) +   # no AD threshold
+  labs(title = "Degree Distribution",
+       x = "Degree",
+       y = "logCumulativeDegree") +
+ # scale_x_continuous(breaks = seq(1, max(dis$degree), by =4)) + # Adjust the x-axis to show only integer degrees
+  scale_color_manual(values = c("AD" = "#A3333D", "no AD" = "#477998")) + # Custom colors for AD and no AD
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +  # Rotate X-axis labels at 45 degrees
+  theme_minimal()
+
+degree_dis_noAD.p <- ggplot(dis_noAD, aes(x = degree, y = log(dis_noAD$CumulativeDegree), group = dx, color = dx)) +
+  geom_point() +
+  geom_line() +
+  #geom_hline(yintercept = processed_distribution[[1]]$threshold, linetype = "dashed", color = "#291F1E", size = 0.5) +  # AD threshold
+  #geom_hline(yintercept = processed_distribution[[2]]$threshold, linetype = "dashed", color = "#291F1E", size = 0.5) +   # no AD threshold
+  labs(title = "Degree Distribution",
+       x = "Degree",
+       y = "logCumulativeDegree") +
+  # scale_x_continuous(breaks = seq(1, max(dis$degree), by =4)) + # Adjust the x-axis to show only integer degrees
+  scale_color_manual(values = c("AD" = "#A3333D", "no AD" = "#477998")) + # Custom colors for AD and no AD
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +  # Rotate X-axis labels at 45 degrees
+  theme_minimal()
+
+
+degree_distribution <- ggplot() +
+  geom_point(data = dis_AD, aes(x = degree, y = log(CumulativeDegree), color = "AD")) +
+  geom_line(data = dis_AD, aes(x = degree, y = log(CumulativeDegree), color = "AD")) +
+  geom_point(data = dis_noAD, aes(x = degree, y = log(CumulativeDegree), color = "no AD")) +
+  geom_line(data = dis_noAD, aes(x = degree, y = log(CumulativeDegree), color = "no AD")) +
+  labs(title = "Degree Distribution",
+       x = "Degree",
+       y = "logCumulativeDegree") +
+  scale_color_manual(values = c("AD" = "#A3333D", "no AD" = "#477998")) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  theme_minimal()
+
 #Save plot
 
 ggsave(filename = "bothdx_cummulative_degree_distributions_coexpression_NIAReagan_histogram.png",
@@ -359,7 +378,7 @@ NodesJaccard
 
 #Apply function to compare edges
 
-EdgesJaccard <- sapply(X = graphLists_plus, FUN = jaccard_edges, g1 = graphLists_plus[[1]])
+EdgesJaccard <- sapply(X = graphLists, FUN = jaccard_edges, g1 = graphLists[[1]])
 EdgesJaccard
 
 #Apply modularity algorithm --- ---

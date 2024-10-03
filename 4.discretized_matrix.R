@@ -15,7 +15,7 @@ pacman::p_load("tidyverse",
 
 metadata <- vroom::vroom(file ="/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/metadata/DLPFC/RNA_seq_metadata_filteredQC_DLPFC.txt")
 dim(metadata)
-#[1] 878  41
+#[1] 1105   42
 
 #Subset by diagnosis --- ---
 
@@ -24,43 +24,21 @@ dim(metadata)
 specimenID_wNIA_reagan <- metadata %>% 
   filter(!is.na(dicho_NIA_reagan))
 dim(specimenID_wNIA_reagan)
-#[1] 878  41
+#[1] 774  42
 
 AD_pathology <- metadata %>% filter(dicho_NIA_reagan == 1)
 dim(AD_pathology)
-#[1] 571  41
+#[1] 473  42
 
 no_AD_pathology <-metadata %>% filter(dicho_NIA_reagan == 0)
 dim(no_AD_pathology)
-#[1] 307  41
-
-#Alternatively, for clinical diagnosis --- --- 
-
-#Filter by clinical diagnosis (cogdx variable is blind to pathological post mortem diagnosis)
-#In many studies, we can use only antemortem dx variables
-
-#Library for no MCI (no dementia known at the moment of death)
-
-NCI_cogdx <- metadata %>% filter(cogdx == 1)
-dim(NCI_cogdx)
-# [1] 201  14 
-
-# For MCI (mild cognitive impairment) and NO other cause of CI
-
-MCI_cogdx <- metadata %>% filter(cogdx == 2)
-dim(MCI_cogdx)
-#[1] 158   14
-
-# Library for AD dementia an no other cause of CI
-
-AD_cogdx <- metadata %>% filter(cogdx == 4)
-dim(AD_cogdx)
-#[1] 222   14   #254 individuals with probable or possible AD
+#[1] 301  42
 
 #Read counts data --- ---
 
 counts <- readRDS(file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/full_counts/ROSMAP_RNAseq_filteredQC_counts_DLPFC.rds")
 dim(counts) 
+#[1] 28263   774
 
 ####  Data discretization --- ---
 
@@ -68,6 +46,7 @@ dim(counts)
 
 mat_dis <- infotheo::discretize(t(counts)) # I t() because we want genes to be columns to calculate MI in next script
 dim(mat_dis)
+#[1]   774 28263
 
 #Regenerate gene names in cols and specimenIDs in rows
 
@@ -94,26 +73,4 @@ saveRDS(AD_pathology_counts, file = "/datos/rosmap/data_by_counts/ROSMAP_counts/
 
 saveRDS(noAD_pathology_counts, file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/ROSMAP_DLFPC_noAD_NIAReagan_discretizedmatrix.rds")
 
-#Subset RNAseq counts by clinical var --- ---
-
-cogdxNCI_counts <- mat_dis %>% dplyr::filter(specimenID %in% NCI_cogdx$specimenID)
-dim(cogdxNCI_counts)
-#[1]   157 22071
-
-cogdxMCI_counts <- mat_dis %>% dplyr::filter(specimenID %in% MCI_cogdx$specimenID)
-dim(cogdxMCI_counts)
-#[1]   124 22071
-
-cogdxAD_counts <- mat_dis%>% dplyr::filter(specimenID %in% AD_cogdx$specimenID)
-dim(cogdxAD_counts)
-#[1]   170 22071
-
-#Save discretized matrix --- --- 
-
-#vroom::vroom_write(cogdxNCI_counts, file = "/datos/rosmap/discretized_matrix/ROSMAP_NCI_cogdx_discretizedmatrix_10022024.txt")
-
-#vroom::vroom_write(cogdxMCI_counts, file = "/datos/rosmap/discretized_matrix/ROSMAP_MCI_cogdx_discretizedmatrix_10022024.txt")
-
-#vroom::vroom_write(cogdxAD_counts, file = "/datos/rosmap/discretized_matrix/ROSMAP_AD_cogdx_discretizedmatrix_10022024.txt")
- 
 #END

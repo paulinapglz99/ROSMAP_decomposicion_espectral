@@ -18,15 +18,15 @@ pacman::p_load('tidyverse',
                "vroom")
 
 #args --- ---
-args <- commandArgs(trailingOnly = TRUE)
-counts <- args[1]
-metadata <- args[2]
+#args <- commandArgs(trailingOnly = TRUE)
+#counts <- args[1]
+#metadata <- args[2]
 
 # Read RDS counts
-counts <- readRDS(counts)
+#counts <- readRDS(counts)
 
 # Read metadata
-metadata <- vroom(metadata)
+#metadata <- vroom(metadata)
 
 #alternatively --- ---
 
@@ -361,7 +361,7 @@ countMatrixFiltered <- filtered.data(counts,
                                      factor = x,       #using dx factor
                                      norm = F,            #counts are not normalized 
                                      method = 1,          #Method 1 (CPM) removes those features that have an average expression per condition less than cpm value and a coefficient of variation per condition higher than cv.cutoff (in percentage) in all the conditions
-                                     cpm = 1,             #Cutoff for the counts per million value
+                                     cpm = 2,             #Cutoff for the counts per million value
                                      p.adj = "fdr")       #Method for the multiple testing correction
 dim(countMatrixFiltered)
 

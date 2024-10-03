@@ -54,88 +54,6 @@ for (i in 1:length(nodes_degree)) {
   q_threshold.de[[i]] <- quantile(nodes_degree[[i]], probs = 0.95)
 }
 
-#For AD --- --- 
-#Plot degree distribution
-AD_distribution.df <- degree_distribution[[1]]
-
-#Order data by degree column
-AD_distribution.df <- AD_distribution.df[order(AD_distribution.df$degree, decreasing = TRUE), ]
-
-#Cummulative sum
-AD_distribution.df$CumulativeDegree <- cumsum(AD_distribution.df$degree)
-
-
-AD_distribution.df$logCumulativeDegree <- log10(AD_distribution.df$CumulativeDegree)
-
-#Add threshold
-AD_CumulativeDegree_threshold <- quantile(AD_distribution.df$CumulativeDegree, probs = 0.95)
-
-#
-AD_distribution_accum <- ggplot(AD_distribution.df, aes(x = reorder(gene, degree), y = CumulativeDegree, group = 1)) +
-  geom_line(color = "blue") +
-  geom_hline(yintercept = AD_CumulativeDegree_threshold, linetype = "dashed", color = "red", size = 1) +
-  labs(title = "Cumulative Distribution",
-       x = "Gene",
-       y = "CumulativeDegree") +
-  theme(axis.text.x = element_blank()) +
-  log10()+
-  annotate("text", x = length(AD_distribution.df$gene)/2, y = AD_CumulativeDegree_threshold,
-           label = "95% Umbral", vjust = -1, color = "red")
-
-grado_freq <- as.data.frame(table(AD_distribution.df$degree))
-
-#For no AD --- --- 
-
-#Plot degree distribution
-noAD_distribution.df <- degree_distribution[[2]]
-
-#Order data by degree column
-noAD_distribution.df <- noAD_distribution.df[order(noAD_distribution.df$degree), ]
-
-#Cummulative sum
-noAD_distribution.df$CumulativeDegree <- cumsum(noAD_distribution.df$degree)
-
-#
-noAD_distribution.df$logCumulativeDegree <- log10(noAD_distribution.df$CumulativeDegree)
-
-#Add threshold
-noAD_CumulativeDegree_threshold <- quantile(noAD_distribution.df$logCumulativeDegree, probs = 0.95)
-
-#
-noAD_distribution_accum <- ggplot(noAD_distribution.df, aes(x = reorder(gene, degree), y = logCumulativeDegree, group = 1)) +
-  geom_line(color = "blue") +
-  geom_hline(yintercept = noAD_CumulativeDegree_threshold, linetype = "dashed", color = "red", size = 1) +
-  labs(title = "Cumulative Distribution",
-       x = "Gene",
-       y = "Accumulated Value") +
-  theme(axis.text.x = element_blank()) +
-  annotate("text", x = length(noAD_distribution.df$gene)/2, y = noAD_CumulativeDegree_threshold,
-           label = "95% Umbral", vjust = -1, color = "red")
-
-#Left join both
-
-degree_distribution.df <- AD_distribution.df %>% left_join(noAD_distribution.df, by = "gene")
-
-AD_distribution <- ggplot(degree_distribution[[1]], aes(x = degree, y = ..density..)) +
-  geom_histogram(binwidth = 1, fill = "#00688B", color = "black") +
-  labs(title = "Degree distribution histogram",
-       subtitle = "for patients with AD",
-       x = "Grado", y = "Freq") +
-  geom_vline(xintercept = q_threshold.de[[1]], color = "red", linetype = "dashed") +
-  geom_text(aes(x = q_threshold.de[[1]], y = 0.06, label = "95th percentile"), color = "red", hjust = -0.1) +
-  theme_minimal()
-
-noAD_distribution <- ggplot(degree_distribution[[2]], aes(x = degree, y = ..density..)) +
-  geom_histogram(binwidth = 1, fill = "#00688B", color = "black") +
-  labs(title = "Degree distribution histogram",
-       subtitle = "for patients with no AD",
-       x = "Grado", y = "Freq") +
-  geom_vline(xintercept = q_threshold.de[[2]], color = "red", linetype = "dashed") +
-  geom_text(aes(x = q_threshold.de[[2]], y = 0.06, label = "95th percentile"), color = "red", hjust = -0.1) +
-  theme_minimal()
-
-grid.arrange(AD_distribution, noAD_distribution)
-
 #Hub genes --- ---
 
 #Hub genes for AD patients
@@ -305,7 +223,7 @@ genes_en_AD_no_noAD_sym
 
 genes_en_AD_no_noAD_sym_enrichment <- enrichGO(
   gene = genes_en_AD_no_noAD_sym,
-  OrgDb = org.Hs.eg.db, 
+  OrgDb = "org.Hs.eg.db", 
   keyType = 'SYMBOL',
   readable = TRUE,
   ont = "BP",          #type of GO(Biological Process (BP), cellular Component (CC), Molecular Function (MF)
