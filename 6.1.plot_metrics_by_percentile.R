@@ -5,7 +5,8 @@
 
 pacman::p_load('dplyr',
                'ggplot2', 
-               'gridExtra')
+               'gridExtra', 
+               'stringr')
 
 #Get ddata --- ---
 
@@ -27,8 +28,6 @@ metrics_noAD <- metrics_noAD %>%
 
 metrics <- rbind(metrics_AD, metrics_noAD)
 
-metrics <- metrics %>% mutate(percentile = ) 
-
 metrics <- metrics %>%
   mutate(
     # Extrae los números después del guion bajo
@@ -45,7 +44,7 @@ metrics <- metrics %>%
   select(-raw_percentile) %>%   
   mutate(
     # Convertir percentile en un factor ordenado
-    percentile = factor(percentile, levels = c("80%", "90%", "98%", "99%", "99.9%", "99.99%", "99.999%", "99.9999%"), ordered = TRUE)
+    percentile = factor(percentile, levels = c("85%", "90%", "98%", "99%", "99.9%", "99.99%", "99.999%", "99.9999%"), ordered = TRUE)
   )
 
 
@@ -175,7 +174,7 @@ max_comp_size_plot <- ggplot(metrics, aes(x = percentile, y = max_comp_size, col
 per_genes_max_size_plot <- ggplot(metrics, aes(x = percentile, y = percentage_genes_in_larger_component, color = dx)) +
   geom_point(size = 3) +
   geom_line(aes(group = dx), size = 1) +
-  scale_y_continuous(limits = c(50, 100), breaks = seq(50, 100, by = 20)) +
+  scale_y_continuous(limits = c(min(metrics$percentage_genes_in_larger_component), 100), breaks = seq(50, 100, by = 20)) +
   scale_color_brewer(palette = "Set1") +  # You can choose different palettes
   labs(title = "% of genes in larger component",
        x = "Percentile",

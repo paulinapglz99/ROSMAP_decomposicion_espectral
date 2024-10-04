@@ -7,7 +7,7 @@
 #Part of code adapted from https://github.com/guillermodeandajauregui/BiologicalModuleComparison/blob/master/comparisonParameters.R
 
 #Libraries --- ---
-install.packages("svglite")
+#install.packages("svglite")
 pacman::p_load("igraph", 
                "ggraph",
                "tidyverse", 
@@ -134,8 +134,8 @@ degree_disnoAD <- ggplot(noADdegree.df, aes(x = degree)) +
 degree_dis <- grid.arrange(degree_disAD, degree_disnoAD, ncol =1 )
 
 #Save plot
-
-# ggsave(filename = "bothdx_degree_distributions_coexpression_NIAReagan_histogram.png",
+# 
+# ggsave(filename = "bothdx_degree_distributions_coexpression_NIAReagan_histogram.jpg",
 #       plot = degree_dis,
 #       width = 25,
 #       height = 20,
@@ -143,169 +143,12 @@ degree_dis <- grid.arrange(degree_disAD, degree_disnoAD, ncol =1 )
 #       dpi = 300,
 #       )
 
-#Other plot
-
-# Realiza la gráfica en escala log-log
-log_log_AD <- ggplot(ADdegree_freq, aes(x = degree, y = Prob)) +
-  geom_point(color = "blue", size = 2, alpha = 0.8) +  # Puntos más grandes y semitransparentes
-  scale_x_log10() +  # Escala logarítmica en el eje x
-  scale_y_log10() +  # Escala logarítmica en el eje y
-  labs(x = expression("<k>"), y = expression(p(k)), 
-       title = "", 
-       subtitle = "AD network \ndegree distribution") +
-  geom_smooth(method = "lm", se = FALSE, color = "black", linetype = "dashed", 
-              size = 1.2, formula = y ~ x) +  # Ajuste lineal con estilo modificado
-  theme_minimal(base_size = 14) +  # Tamaño base de texto para mejor legibilidad
-  theme(
-    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),  # Centrar título y agrandar
-    axis.title = element_text(size = 14),  # Tamaño de títulos de ejes
-    axis.text = element_text(size = 12),   # Tamaño de etiquetas de ejes
-    panel.grid = element_line(size = 0.5, color = "grey80")  # Líneas de cuadrícula más sutiles
-  )
-
-
-log_log_noAD <-  ggplot(noADdegree_freq, aes(x = degree, y = Prob)) +
-  geom_point(color = "blue", size = 2, alpha = 0.8) +  # Puntos más grandes y semitransparentes
-  scale_x_log10() +  # Escala logarítmica en el eje x
-  scale_y_log10() +  # Escala logarítmica en el eje y
-  labs(x = expression("<k>"), y = expression(p(k)), 
-       title = "", 
-       subtitle = "No AD network \ndegree distribution") +
-  geom_smooth(method = "lm", se = FALSE, color = "black", linetype = "dashed", 
-              size = 1.2, formula = y ~ x) +  # Ajuste lineal con estilo modificado
-  theme_minimal(base_size = 14) +  # Tamaño base de texto para mejor legibilidad
-  theme(
-    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),  # Centrar título y agrandar
-    axis.title = element_text(size = 14),  # Tamaño de títulos de ejes
-    axis.text = element_text(size = 12),   # Tamaño de etiquetas de ejes
-    panel.grid = element_line(size = 0.5, color = "grey80")  # Líneas de cuadrícula más sutiles
-  )
-
-log_grid <- grid.arrange(log_log_AD, log_log_noAD, ncol =2)
-
-ggsave(filename = "degree_dis_loglog.jpg",
-      plot = log_grid,
-      width = 25,
-      height = 25,
-      units = "cm",
-      dpi = 300,
-      )
-
-#Plot cummulative degree distribution --- ---
-
-#Calculate degree of nodes
-nodes_degree <- sapply(X = graphLists, FUN = degree)
-
-#Table of degree distribution
-degree_distributions
-degree_distribution <- list()
-
-for (i in 1:length(nodes_degree)) {
-  degree_distribution[[i]] <- data.frame(gene = names(nodes_degree[[i]]), degree = nodes_degree[[i]])
-}
-
-#Calculate percentile 95 of genes with higher degree ---- ---
-
-processed_distribution <- lapply(degree_distribution, FUN = process_distribution)
-
-dis_AD <- processed_distribution[[1]]$degree_distribution
-dis_AD$dx <- "AD"
-dis_noAD <-  processed_distribution[[2]]$degree_distribution
-dis_noAD$dx<- "no AD"
-
-dis <- rbind(dis_AD, dis_noAD)
-
-dis$degree <- as.numeric(dis$degree)
-
-degree_distr.p <- ggplot(dis, aes(x = as.factor(degree), y = log(dis$CumulativeDegree), group = dx, color = dx)) +
-  geom_point() +
-  geom_line() +
-  # geom_hline(yintercept = processed_distribution[[1]]$threshold, linetype = "dashed", color = "#291F1E", size = 0.5) +  # AD threshold
-  # geom_hline(yintercept = processed_distribution[[2]]$threshold, linetype = "dashed", color = "#291F1E", size = 0.5) +   # no AD threshold
-  labs(title = "Degree Distribution",
-       x = "Degree",
-       y = "logCumulativeDegree") +
-  #scale_x_continuous(breaks = seq(1, max(dis$degree), by =4)) + # Adjust the x-axis to show only integer degrees
-  scale_color_manual(values = c("AD" = "#A3333D", "no AD" = "#477998")) + # Custom colors for AD and no AD
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +  # Rotate X-axis labels at 45 degrees
-  theme_minimal()
-
-degree_distr.p    
-
-
-degree_dis_AD.p <- ggplot(dis_AD, aes(x = degree, y = log(dis_AD$CumulativeDegree), group = dx, color = dx)) +
-  geom_point() +
-  geom_line() +
-  #geom_hline(yintercept = processed_distribution[[1]]$threshold, linetype = "dashed", color = "#291F1E", size = 0.5) +  # AD threshold
-  #geom_hline(yintercept = processed_distribution[[2]]$threshold, linetype = "dashed", color = "#291F1E", size = 0.5) +   # no AD threshold
-  labs(title = "Degree Distribution",
-       x = "Degree",
-       y = "logCumulativeDegree") +
- # scale_x_continuous(breaks = seq(1, max(dis$degree), by =4)) + # Adjust the x-axis to show only integer degrees
-  scale_color_manual(values = c("AD" = "#A3333D", "no AD" = "#477998")) + # Custom colors for AD and no AD
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +  # Rotate X-axis labels at 45 degrees
-  theme_minimal()
-
-degree_dis_noAD.p <- ggplot(dis_noAD, aes(x = degree, y = log(dis_noAD$CumulativeDegree), group = dx, color = dx)) +
-  geom_point() +
-  geom_line() +
-  #geom_hline(yintercept = processed_distribution[[1]]$threshold, linetype = "dashed", color = "#291F1E", size = 0.5) +  # AD threshold
-  #geom_hline(yintercept = processed_distribution[[2]]$threshold, linetype = "dashed", color = "#291F1E", size = 0.5) +   # no AD threshold
-  labs(title = "Degree Distribution",
-       x = "Degree",
-       y = "logCumulativeDegree") +
-  # scale_x_continuous(breaks = seq(1, max(dis$degree), by =4)) + # Adjust the x-axis to show only integer degrees
-  scale_color_manual(values = c("AD" = "#A3333D", "no AD" = "#477998")) + # Custom colors for AD and no AD
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +  # Rotate X-axis labels at 45 degrees
-  theme_minimal()
-
-
-degree_distribution <- ggplot() +
-  geom_point(data = dis_AD, aes(x = degree, y = log(CumulativeDegree), color = "AD")) +
-  geom_line(data = dis_AD, aes(x = degree, y = log(CumulativeDegree), color = "AD")) +
-  geom_point(data = dis_noAD, aes(x = degree, y = log(CumulativeDegree), color = "no AD")) +
-  geom_line(data = dis_noAD, aes(x = degree, y = log(CumulativeDegree), color = "no AD")) +
-  labs(title = "Degree Distribution",
-       x = "Degree",
-       y = "logCumulativeDegree") +
-  scale_color_manual(values = c("AD" = "#A3333D", "no AD" = "#477998")) +
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
-  theme_minimal()
-
-#Save plot
-
-ggsave(filename = "bothdx_cummulative_degree_distributions_coexpression_NIAReagan_histogram.png",
-      plot = degree_distr.p,
-      width = 20,
-      height = 10,
-      units = "in",
-      dpi = 300,
-      )
-
-#Save grid
-
-layout_matrix <- rbind(c(1, 2),
-                       c(1, 3))
-
-# Open the SVG device
-svg("AD_grid_plot.svg", width = 10, height = 8)  # You can adjust the width and height to your needs
-
-grid.arrange(degree_distr.p, degree_disAD, degree_disnoAD, layout_matrix = layout_matrix)
-
-# Close the device
-dev.off()
-
-#Adjust the power-law distribution with poweRlaw: --- ---
-
-# Convertir los grados a un objeto de la clase 'displ' para ajustar una distribución power-law
-pl_model <- displ$new(degree_distribution)
-
 #Calculate diameter of both graphs --- --- 
 
 diameter <- sapply(X = graphLists, FUN = diameter)
 
 # graphAD graphnoAD 
-# 17        24 
+# 13       12 
 
 #Eigenvector centrality of the network --- ---
 
@@ -317,6 +160,8 @@ clustering_coefficient <- sapply(X = graphLists, FUN = transitivity)
 
 # graphAD graphnoAD 
 # 0.3357295 0.2979033 
+
+infomap_modularity <- sapply(X = graphLists, FUN = cluster_infomap)
 
 # Extract information from the modules
 
