@@ -29,33 +29,13 @@ jaccard_edges <- function(g1, g2){
 
 #Declare function that compares nodes
 
-# #jaccard_nodes <- function(g1,g2){
-#   a = sort(vertex.attributes(graph = g1)[["name"]])
-#   b = sort(vertex.attributes(graph = g2)[["name"]])
-#   
-#   deLaCueva = length(intersect(a,b))/length(union(a,b))
-#   return(deLaCueva)
-# }
+jaccard_nodes <- function(g1,g2){
+  a = sort(vertex.attributes(graph = g1)[["name"]])
+  b = sort(vertex.attributes(graph = g2)[["name"]])
 
-#Distribution 
-
-process_distribution <- function(degree_distribution) {
-  # Convert to data frame and count frequencies
-  distribution.df <- as.data.frame(table(degree_distribution$degree))
-  # Rename the column
-  distribution.df <- distribution.df %>% rename(degree = "Var1")
-  # Order by degree
-  distribution.df <- distribution.df[order(distribution.df$degree, decreasing = F), ]
-  # Calculate the cumulative sum
-  distribution.df$CumulativeDegree <- cumsum(distribution.df$Freq)
-  # Logarithm of the cumulative sum
-  distribution.df$logCumulativeDegree <- log10(distribution.df$CumulativeDegree)
-  # Add threshold
-  CumulativeDegree_threshold <- quantile(distribution.df$logCumulativeDegree, probs = 0.95)
-  # Puedes devolver el umbral si es necesario, por ejemplo:
-  return(list(degree_distribution = distribution.df, cumm_threshold = CumulativeDegree_threshold))
+  deLaCueva = length(intersect(a,b))/length(union(a,b))
+  return(deLaCueva)
 }
-
 
 #Get data --- --- 
 
@@ -70,98 +50,40 @@ graphLists <- list(graphAD = graphAD,
 
 #Network topological comparison --- --- 
 
-#Table of degree distribution
-
-#Degree distributions of all graphs in my list
-degree_distributions <- sapply(X = graphLists, FUN = degree)
-
-#Build degree distribution dataframe
-
-ADdegree <- degree_distributions[["graphAD"]]
-ADdegree.df <- data.frame(gene = names(ADdegree), degree = ADdegree)
-ADdegree_freq <- table(ADdegree.df$degree) %>% as.data.frame()
-colnames(ADdegree_freq) <- c("degree", "Freq")
-ADdegree_freq$degree <- as.numeric(as.character(ADdegree_freq$degree))
-ADdegree_freq$Prob <- ADdegree_freq$Freq / sum(ADdegree_freq$Freq) # Frecuencia relativa
-
-noADdegree <- degree_distributions[["graphnoAD"]]
-noADdegree.df <- data.frame(gene = names(noADdegree), degree = noADdegree)
-noADdegree_freq <- table(noADdegree.df$degree) %>% as.data.frame()
-colnames(noADdegree_freq) <- c("degree", "Freq")
-noADdegree_freq$degree <- as.numeric(as.character(noADdegree_freq$degree))
-noADdegree_freq$Prob <- noADdegree_freq$Freq / sum(noADdegree_freq$Freq) # Frecuencia relativa
-
-# Find the max value of "Freq" in both networks
-max_freq_AD <- max(ADdegree_freq$Freq)
-max_freq_noAD <- max(noADdegree_freq$Freq)
-
-# Find max degree value in both graphs 
-max_degree_AD <- max(as.numeric(as.character(ADdegree_freq$degree)))
-max_degree_noAD <- max(as.numeric(as.character(noADdegree_freq$degree)))
-
-# Define limits for make histograms comparable
-max_y <- max(max_freq_AD, max_freq_noAD)
-max_x <- max(max_degree_AD, max_degree_noAD)
-
-#Plot both degree distributions
-
-degree_disAD <- ggplot(ADdegree.df, aes(x = degree)) +
-  geom_histogram(binwidth = 1, color = "black", fill = "#961D4E", position = "identity") +
-  labs(title = "Node degree distributions",
-       subtitle = "for AD coexpression network", 
-       x = "Degree",
-       y = "Freq") +
-  theme_minimal() +
-  scale_y_continuous(limits = c(0, max_y), expand = c(0, 0)) + 
-  scale_x_continuous(limits = c(0, max_x), breaks = seq(0, max_x, by = 10)) + 
-  scale_fill_manual() +
-  guides(fill = guide_legend(title = "Diagnosis"))
-
-degree_disnoAD <- ggplot(noADdegree.df, aes(x = degree)) +
-  geom_histogram(binwidth = 1,color = "black", fill = "#6153CC",  position = "identity") +
-  labs(title = "Node degree distributions",
-       subtitle = "for no AD coexpression network", 
-       x = "Degree",
-       y = "Freq") +
-  theme_minimal() +
-  scale_y_continuous(limits = c(0, max_y), expand = c(0, 0)) +  # Normalizar el eje y
-  scale_x_continuous(limits = c(0, max_x),breaks = seq(0, max_x, by = 10)) + 
-  scale_fill_manual() +
-  guides(fill = guide_legend(title = "Diagnosis"))
-
-#Arrange in a grid
-
-degree_dis <- grid.arrange(degree_disAD, degree_disnoAD, ncol =1 )
-
-#Save plot
-# 
-# ggsave(filename = "bothdx_degree_distributions_coexpression_NIAReagan_histogram.jpg",
-#       plot = degree_dis,
-#       width = 25,
-#       height = 20,
-#       units = "cm",
-#       dpi = 300,
-#       )
-
 #Calculate diameter of both graphs --- --- 
 
 diameter <- sapply(X = graphLists, FUN = diameter)
-
+diameter
 # graphAD graphnoAD 
 # 13       12 
+
+#Size of larger component --- ---
+
+max(components(graphAD)$csize)
+
+max(components(graphnoAD)$csize)
+
 
 #Eigenvector centrality of the network --- ---
 
 eigen <- sapply(graphLists, FUN = eigen_centrality)
+eigen
+
+# graphAD      graphnoAD   
+# vector  numeric,1113 numeric,1074
+# value   178.6451     187.1376    
+# options list,20      list,20 
 
 #Calculate clustering coefficient of both networks ---- ---
 
 clustering_coefficient <- sapply(X = graphLists, FUN = transitivity)
+clustering_coefficient
 
 # graphAD graphnoAD 
-# 0.3357295 0.2979033 
+# 0.5956005 0.6252799 
 
 infomap_modularity <- sapply(X = graphLists, FUN = cluster_infomap)
+infomap_modularity
 
 # Extract information from the modules
 
@@ -187,25 +109,28 @@ noADnodes <- V(graphnoAD)
 
 # Find elements in noADnodes but not in ADnodes
 missing_elements_in_ADnodes <- setdiff(names(noADnodes), names(ADnodes))
+missing_elements_in_ADnodes <- as.list(missing_elements_in_ADnodes)
+names(missing_elements_in_ADnodes) <- missing_elements_in_ADnodes
 length(missing_elements_in_ADnodes)
 
 # Find elements in ADnodes but not in noADnodes
 missing_elements_in_noADnodes <- setdiff(names(ADnodes), names(noADnodes))
+missing_elements_in_noADnodes <- as.list(missing_elements_in_noADnodes)
+names(missing_elements_in_noADnodes) <- missing_elements_in_noADnodes
 length(missing_elements_in_noADnodes)
 
 #Add nodes missing to AD graph
 
-graphAD_plus <- add_vertices(graphAD, nv = length(missing_elements_in_ADnodes))
+graphAD_plus <- add_vertices(graphAD, nv = length(missing_elements_in_ADnodes), attr = missing_elements_in_ADnodes)
 
 #Add nodes missing to noAD graph
 
-graphnoAD_plus <- add_vertices(graphnoAD, nv = length(missing_elements_in_noADnodes))
+graphnoAD_plus <- add_vertices(graphnoAD, nv = length(missing_elements_in_noADnodes), attr = missing_elements_in_noADnodes)
 
 #Set list of graphs
 
 graphLists_plus <- list(graphAD_plus = graphAD_plus, 
-                        graphnoAD_plus =graphnoAD_plus)
-
+                        graphnoAD_plus = graphnoAD_plus)
 
 #Do they have similar nodes? --- --- 
 
@@ -225,6 +150,9 @@ NodesJaccard
 
 EdgesJaccard <- sapply(X = graphLists, FUN = jaccard_edges, g1 = graphLists[[1]])
 EdgesJaccard
+
+# graphAD graphnoAD 
+# 1.0000000 0.6839084 
 
 #Apply modularity algorithm --- ---
 

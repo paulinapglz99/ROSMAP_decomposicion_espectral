@@ -64,12 +64,19 @@ jaccard_simplex <- function(a,b){
   length(intersect(a,b))/length(union(a,b))
 }
 
+# Crear una función para calcular el Jaccard Index
+jaccard_index <- function(set1, set2) {
+  intersection <- length(intersect(set1, set2))
+  union <- length(union(set1, set2))
+  return(intersection / union)
+}
+
 #Get data --- --- 
 
-graphAD <- read_graph(file =  '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/ROSMAP_RNAseq_DLPFC_AD_MutualInfograph_percentile99.99.graphml',
+graphAD <- read_graph(file =  '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/ROSMAP_RNAseq_DLPFC_AD_MutualInfograph_percentile99.99_trad.graphml',
                       format = 'graphml')
 
-graphnoAD <- read_graph(file = '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/ROSMAP_RNAseq_DLPFC_noAD_MutualInfograph_percentile99.99.graphml',
+graphnoAD <- read_graph(file = '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/ROSMAP_RNAseq_DLPFC_noAD_MutualInfograph_percentile99.99_trad.graphml',
                         format = 'graphml')
 
 universe <- scan(file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/universe.txt", what = character())
@@ -129,7 +136,8 @@ enrichment_fullnet_noAD_dot <- dotplot(enrichment_fullnet_noAD)
 
 OverallEnrichedProcessJ <- jaccard_simplex(names(enrichment_fullnet_AD@geneSets), names(enrichment_fullnet_noAD@geneSets))
 #[1] 0.8042686
-#This answers the question of 2. How similar are the modules found in each network, in terms of the sets of associated biological functions?
+
+#This answers the question 2. How similar are the modules found in each network, in terms of the sets of associated biological functions?
   
 #Similarity of modules in terms of associated biological functions --- ---
 
@@ -176,6 +184,46 @@ for (i in seq_along(graphLists)) {
 nodes_by_community_list <- lapply(seq_along(nodes_membership), function(i) {
   split(V(graphLists[[i]])$name, nodes_membership[[i]])
 })
+
+# Extraer los genes de cada módulo
+modules_AD <- split(nodes_membership_AD.df$ensembl_gene_id, nodes_membership_AD.df$membership)
+modules_noAD <- split(nodes_membership_noAD.df$ensembl_gene_id, nodes_membership_noAD.df$membership)
+
+# Crear la matriz de similitud
+similarity_matrix <- matrix(0, nrow = length(modules_AD), ncol = length(modules_noAD))
+
+# Rellenar la matriz con los índices de similitud Jaccard
+for (i in seq_along(modules_AD)) {
+  for (j in seq_along(modules_noAD)) {
+    similarity_matrix[i, j] <- jaccard_index(modules_AD[[i]], modules_noAD[[j]])
+  }
+}
+
+# Nombrar filas y columnas según los módulos
+rownames(similarity_matrix) <- paste0("Module_AD_", seq_along(modules_AD))
+colnames(similarity_matrix) <- paste0("Module_noAD_", seq_along(modules_noAD))
+
+# Visualizar la matriz de similitud
+similarity_matrix
+dim(similarity_matrix)
+#[1] 65 71
+
+#Is there any modules with perfect similitude?
+
+length(similarity_matrix[similarity_matrix == 1])
+#[1] 10
+
+# Buscar posiciones de valores iguales a 1
+pairs_with_one <- which(similarity_matrix == 1, arr.ind = TRUE)
+
+# Crear dataframe con los nombres de los módulos correspondientes
+module_pairs <- data.frame(
+  module_AD = rownames(similarity_matrix)[pairs_with_one[, "row"]],
+  module_noAD = colnames(similarity_matrix)[pairs_with_one[, "col"]]
+)
+
+# Imprimir el dataframe corregido
+print(module_pairs)
 
 #In which modules are found our hub genes? --- ---
 

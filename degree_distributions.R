@@ -57,6 +57,36 @@ max_degree_noAD <- max(as.numeric(as.character(noADdegree_freq$degree)))
 max_y <- max(max_freq_AD, max_freq_noAD)
 max_x <- max(max_degree_AD, max_degree_noAD)
 
+##### Histograms #####
+
+degree_disAD <- ggplot(ADdegree.df, aes(x = degree)) +
+  geom_histogram(binwidth = 1, color = "black", fill = "#961D4E", position = "identity") +
+  labs(title = "Node degree distributions",
+       subtitle = "for AD coexpression network", 
+       x = "Degree",
+       y = "Freq") +
+  theme_minimal() +
+  scale_y_continuous(limits = c(0, max_y), expand = c(0, 0)) + 
+  scale_x_continuous(limits = c(0, max_x), breaks = seq(0, max_x, by = 10)) + 
+  scale_fill_manual() +
+  guides(fill = guide_legend(title = "Diagnosis"))
+
+degree_disnoAD <- ggplot(noADdegree.df, aes(x = degree)) +
+  geom_histogram(binwidth = 1,color = "black", fill = "#6153CC",  position = "identity") +
+  labs(title = "Node degree distributions",
+       subtitle = "for no AD coexpression network", 
+       x = "Degree",
+       y = "Freq") +
+  theme_minimal() +
+  scale_y_continuous(limits = c(0, max_y), expand = c(0, 0)) +  # Normalizar el eje y
+  scale_x_continuous(limits = c(0, max_x),breaks = seq(0, max_x, by = 10)) + 
+  scale_fill_manual() +
+  guides(fill = guide_legend(title = "Diagnosis"))
+
+#Arrange in a grid
+
+degree_dis <- grid.arrange(degree_disAD, degree_disnoAD, ncol =1 )
+
 ###### log-log graph ######
 
 log_log_AD <- ggplot(ADdegree_freq, aes(x = degree, y = Prob)) +
@@ -104,6 +134,40 @@ log_grid <- grid.arrange(log_log_AD, log_log_noAD, ncol =2)
 #        dpi = 300,
 # )
 
+#Superponed
+
+# Combinar ambos data.frames
+combined_degree_freq <- rbind(ADdegree_freq, noADdegree_freq)
+
+# Crear el gráfico combinado
+log_log_combined <- ggplot(combined_degree_freq, aes(x = degree, y = Prob, color = dx)) +
+  geom_point(size = 2, alpha = 0.8) +  # Puntos más grandes y semitransparentes
+  scale_x_log10() +  # Escala logarítmica en el eje x
+  scale_y_log10() +  # Escala logarítmica en el eje y
+  labs(x = expression("log<k>"), y = expression(logp(k)), 
+       title = " ", 
+       subtitle = "a)") +
+  geom_smooth(method = "lm", se = FALSE, linetype = "longdash", 
+              size = 1.2, aes(color = dx), formula = y ~ x) +  # Ajuste lineal con colores diferenciados
+  theme_minimal(base_size = 14) +  # Tamaño base de texto para mejor legibilidad
+  theme(
+    axis.title = element_text(size = 14),  # Tamaño de títulos de ejes
+    axis.text = element_text(size = 12),   # Tamaño de etiquetas de ejes
+    panel.grid = element_line(size = 0.5, color = "grey80")  # Líneas de cuadrícula más sutiles
+  ) +
+  scale_color_manual(values = c("AD" = "blue", "No AD" = "red")) +
+  theme(legend.position = "none" )
+
+# Mostrar el gráfico
+log_log_combined
+
+ggsave(filename = "combined_degree_dis_loglog.jpg",
+       plot = log_log_combined,
+       width = 25,
+       height = 25,
+       units = "cm",
+       dpi = 300,
+)
 
 ###########  k vs P(k) distribution ########
 
@@ -174,5 +238,47 @@ k_logpk_noAD <-  ggplot(noADdegree_freq, aes(x = degree, y = Prob)) +
   )
 
 k_pk_grid <- grid.arrange(k_logpk_AD, k_logpk_noAD, ncol =2)
+
+#Cummulative degree
+
+degree_distr_x.p <- ggplot(dis, aes(x = as.numeric(degree), y = as.numeric(CumulativeDegree), color = dx)) +
+ #geom_point(size = 1.5) +
+  geom_line(size = 2) +
+  #geom_smooth(method = "loess", se = FALSE, size = 1.5) +  # Suavizado LOESS para suavizar la línea
+  scale_x_continuous(limits = c(min(dis$degree), max(dis$degree)), breaks = seq(min(dis$degree), max(dis$degree), by = 15)) +  # Ajusta el eje X
+  labs(subtitle = "b)", x = "Degree",
+       y = "Cumulative Degree") +
+  #scale_x_continuous(breaks = seq(1, max(dis$degree), by =4)) + # Adjust the x-axis to show only integer degrees
+  scale_color_manual(values = c("AD" = "#A3333D", "no AD" = "#477998")) + # Custom colors for AD and no AD
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +  # Rotate X-axis labels at 45 degrees
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_blank(),  # Elimina las líneas de la cuadrícula principal
+    #panel.grid.minor = element_blank()   # Elimina las líneas de la cuadrícula secundaria
+  )
+
+degree_distr_x.p
+
+
+ggsave(filename = "accum_distr.jpg",
+       plot = degree_distr_x.p,
+       width = 50,
+       height = 25,
+       units = "cm",
+       dpi = 300,
+)
+
+
+#Final panel
+
+panel <- grid.arrange(log_log_combined, degree_distr_x.p, ncol = 2)
+
+ggsave(filename = "panel_loglog_accum_distr.jpg",
+       plot = panel,
+       width = 50,
+       height = 25,
+       units = "cm",
+       dpi = 300,
+)
 
 #END
