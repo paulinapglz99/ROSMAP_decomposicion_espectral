@@ -2,7 +2,7 @@
 #This script builds two null models for each graph, by randomizing the networks while preserving the degree distribution. 
 #Specifically, we rewired the edges of the original networks 1,000 times using a degree-preserving randomization algorithm. 
 pacman::p_load("igraph", 
-        "ggplot")
+        "ggplot2")
 
 #Declare functions ----
 
@@ -10,8 +10,9 @@ pacman::p_load("igraph",
 calculate_metrics <- function(graph) {
   list(
     clustering = transitivity(graph, type = "global"),  # Global clustering coefficient
+    assortativity = assortativity_degree(graph),
     avg_path_length = mean_distance(graph, directed = FALSE),  # Average path length
-    modularity = modularity(cluster_infomap(graph)),  # Modularity of the network, using infomap
+    modularity = modularity(cluster_infomap(graph))  # Modularity of the network, using infomap
   )
 }
 
@@ -41,8 +42,8 @@ plot_metric_distribution <- function(random_metrics, observed_metric, metric_nam
   ggplot(random_df, aes(x = value)) +
     geom_histogram(aes(y = ..density..), binwidth = 0.001, fill = "lightblue", color = "black", alpha = 0.7) +
     geom_density(color = "blue", lwd = 1) +
-    geom_vline(aes(xintercept = observed_metric), color = "red", linetype = "dashed", size = 1.2) +
-    labs(title = paste("Null Model for", metric_name, "(", graph_type, ")"), 
+    geom_vline(aes(xintercept = observed_metric), color = "red", linetype = "dashed", size = 0.8) +
+    labs(title = paste(metric_name, "(",graph_type,")"), 
          x = metric_name, 
          y = "Density") + 
     theme_minimal()
@@ -77,25 +78,39 @@ clustering_AD_random <- sapply(metrics_AD_random, function(x) x$clustering)
 clustering_noAD_random <- sapply(metrics_noAD_random, function(x) x$clustering)
 
 # Plot clustering coefficient distribution
-plot_metric_distribution(clustering_AD_random, metrics_AD$clustering, "Clustering Coefficient", "AD")
-plot_metric_distribution(clustering_noAD_random, metrics_noAD$clustering, "Clustering Coefficient", "noAD")
+clust_AD <- plot_metric_distribution(clustering_AD_random, metrics_AD$clustering, "Clustering Coefficient", "AD")
+clust_noAD <- plot_metric_distribution(clustering_noAD_random, metrics_noAD$clustering, "Clustering Coefficient", "control")
 
 # Extract average path length 
 
-path_length_AD_random <- sapply(metrics_AD_random, function(x) x$avg_path_length)
-path_length_noAD_random <- sapply(metrics_noAD_random, function(x) x$avg_path_length)
+asort_AD_random <- sapply(metrics_AD_random, function(x) x$assortativity)
+asort_noAD_random <- sapply(metrics_noAD_random, function(x) x$assortativity)
 
 # Plot clustering average path length
-plot_metric_distribution(path_length_AD_random, metrics_AD$avg_path_length, "Average path length", "AD")
-plot_metric_distribution(path_length_noAD_random, metrics_noAD$avg_path_length, "Average path length", "noAD")
+asort_AD <- plot_metric_distribution(path_length_AD_random, metrics_AD$assortativity, "Assortativity", "AD")
+asort_noAD <- plot_metric_distribution(path_length_noAD_random, metrics_noAD$assortativity, "Assortativity", "control")
 
 # Extract modularity for the random networks (AD and noAD)
 modularity_AD_random <- sapply(metrics_AD_random, function(x) x$modularity)
 modularity_noAD_random <- sapply(metrics_noAD_random, function(x) x$modularity)
 
 # Plot clustering average path length
-plot_metric_distribution(modularity_AD_random, metrics_AD$modularity, "Modularity", "AD")
-plot_metric_distribution(modularity_noAD_random, metrics_noAD$modularity, "Modularity", "noAD")
+modu_AD <- plot_metric_distribution(modularity_AD_random, metrics_AD$modularity, "Modularity", "AD")
+modu_noAD <- plot_metric_distribution(modularity_noAD_random, metrics_noAD$modularity, "Modularity", "control")
+
+#Grid null model
+
+grid_nullm <- grid.arrange(clust_AD, clust_noAD, asort_AD, asort_noAD, modu_AD, modu_noAD, ncol = 2, top = "Null model for")
+
+ggsave(
+  "null_model_grid.jpg",
+  plot = grid_nullm,
+  device = "jpg",
+  width = 15,
+  height = 10,
+  units = "in",
+  dpi = 300
+)
 
 # Confidence invtervals
 
@@ -111,5 +126,27 @@ print(clustering_ci_AD)
 print(metrics_AD$clustering)
 print(clustering_ci_noAD)
 print(metrics_noAD$clustering)
+
+# Intervalo de confianza al 95% para asortatividad
+
+aso_ci_AD <- quantile(asort_AD_random, probs = c(0.025, 0.975))
+aso_ci_noAD <- quantile(asort_noAD_random, probs = c(0.025, 0.975))
+
+# Verificar si el valor observado cae fuera del intervalo de confianza
+print(aso_ci_AD)
+print(metrics_AD$assortativity)
+print(aso_ci_noAD)
+print(metrics_noAD$assortativity)
+
+# Intervalo de confianza al 95% para modularidad
+
+modu_ci_AD <- quantile(modularity_AD_random, probs = c(0.025, 0.975))
+modu_ci_noAD <- quantile(modularity_noAD_random, probs = c(0.025, 0.975))
+
+# Verificar si el valor observado cae fuera del intervalo de confianza
+print(modu_ci_AD)
+print(metrics_AD$modularity)
+print(modu_ci_noAD)
+print(metrics_noAD$modularity)
 
 #END

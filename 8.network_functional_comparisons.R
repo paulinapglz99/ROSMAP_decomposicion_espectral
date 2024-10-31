@@ -20,7 +20,9 @@ pacman::p_load("igraph",
                "tidyverse",
                "clusterProfiler", 
                "gridExtra", 
-               "biomaRt")
+               "biomaRt", 
+               "ggraph",
+               "tidyheatmaps")
 
 library("org.Hs.eg.db", character.only = TRUE)
 
@@ -30,35 +32,7 @@ set.seed(10)
 
 # Define functions --- ---
 
-# Connecting to the Ensembl database through biomaRt
-ensembl <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
-
-# Define function to convert from ENSMBL to SYMBOL
-convert_ens_to_symbol <- function(ensembl_ids) {
-  getBM(attributes = c("ensembl_gene_id", "external_gene_name", "chromosome_name"),
-        filters = "ensembl_gene_id",
-        values = ensembl_ids,
-        mart = ensembl)
-}
-
-# Define function for translating vertex names 
-
-translate_vertex_names <- function(graph) {
-  graph_vnames <- V(graph)$name   # Extract vertex names
-  graph_vnames_trad <- convert_ens_to_symbol(graph_vnames)   # Translate names
-  # Replace the missing values in the column 'external_gene_name' with the values of 'ensembl_gene_id'.
-  graph_vnames_trad$external_gene_name <- ifelse(graph_vnames_trad$external_gene_name == "", graph_vnames_trad$ensembl_gene_id, graph_vnames_trad$external_gene_name)
-  # Create a vector of translated names using the dictionary
-  # We need to ensure that the actual names of the network are in the dictionary
-  graph_vnames_trad <- setNames(graph_vnames_trad$external_gene_name, graph_vnames_trad$ensembl_gene_id)
-  # Sort graph_vnames_trad according to the order of graph_vnames
-  sorted_graph_vnames_trad <- graph_vnames_trad[match(graph_vnames, names(graph_vnames_trad))]
-  # Assign the new names to the network vertices.
-  V(graph)$name <- sorted_graph_vnames_trad
-  return(graph)
-}
-
-#Define similarity of Enriched Processes, Jaccard Index function --- ---
+#Define similarity of Enriched Processes, Jaccard Index function 
 
 jaccard_simplex <- function(a,b){
   length(intersect(a,b))/length(union(a,b))
@@ -145,13 +119,24 @@ OverallEnrichedProcessJ <- jaccard_simplex(names(enrichment_fullnet_AD@geneSets)
 
 modularities <- sapply(X = graphLists, FUN = cluster_infomap)
 
+#Count modules
+
+len_mod <- sapply(X = modularities, FUN = length)
+# graphAD graphnoAD 
+# 67        72
+
 #Calculate Q score 
 
 Qscore <- sapply(modularities, FUN = modularity)
+# graphAD graphnoAD 
+# 0.2825230 0.2027528 
 
 #Calculate clustering coefficient
 
 clus_coe <- sapply(graphLists, FUN = transitivity)
+ 
+# graphAD graphnoAD 
+# 0.5956005 0.6252799 
 
 #Split lists of nodes by module
 
@@ -174,10 +159,39 @@ for (i in seq_along(graphLists)) {
   # Generate filename for each graph (e.g., graphAD.graphml, graphnoAD.graphml)
   graph_name <- ifelse(i == 1, "graphAD", "graphnoAD")
   filename <- paste0(graph_name, "nodes_membership.graphml")
-  
+
   # Export graph to GraphML format
   write_graph(graphLists[[i]], file = filename, format = "graphml")
 }
+
+#If you already have the networks
+
+
+graphAD <- read_graph(file =  '~/redesROSMAP/graphADnodes_membership.graphml',
+                      format = 'graphml')
+
+graphnoAD <- read_graph(file = '~/redesROSMAP/graphnoADnodes_membership.graphml',
+                        format = 'graphml')
+
+universe <- scan(file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/universe.txt", what = character())
+
+#Save graphs in a list
+
+graphLists <- list(graphAD = graphAD,
+                   graphnoAD = graphnoAD)
+
+#Plot networks
+# Attach communities to relevant vertices
+graphLists <- lapply(seq_along(graphLists), function(i) {
+  V(graphLists[[i]])$color <- modularities[[i]]$membership
+  graphLists[[i]]  # Devolver el grafo modificado
+})
+
+# Asignar tamaños de nodos según el grado para cada grafo en graphLists
+graphLists <- lapply(graphLists, function(g) {
+  V(g)$size <- degree(g)  # Asigna el grado como tamaño de los nodos
+  g  # Devuelve el grafo modificado
+})
 
 # Extract list of nodes by community for each graph
 
@@ -200,18 +214,23 @@ for (i in seq_along(modules_AD)) {
 }
 
 # Nombrar filas y columnas según los módulos
-rownames(similarity_matrix) <- paste0("Module_AD_", seq_along(modules_AD))
-colnames(similarity_matrix) <- paste0("Module_noAD_", seq_along(modules_noAD))
+rownames(similarity_matrix) <- paste0("AD_", seq_along(modules_AD))
+colnames(similarity_matrix) <- paste0("control_", seq_along(modules_noAD))
 
 # Visualizar la matriz de similitud
 similarity_matrix
 dim(similarity_matrix)
-#[1] 65 71
+#[1] 68 71
 
 #Is there any modules with perfect similitude?
 
 length(similarity_matrix[similarity_matrix == 1])
 #[1] 10
+
+#Is there any modules with moderate similitude?
+
+length(similarity_matrix[similarity_matrix > 0.5])
+#[1]
 
 # Buscar posiciones de valores iguales a 1
 pairs_with_one <- which(similarity_matrix == 1, arr.ind = TRUE)
@@ -224,6 +243,54 @@ module_pairs <- data.frame(
 
 # Imprimir el dataframe corregido
 print(module_pairs)
+
+#Create heatmap
+# Convertimos la matriz en un formato largo
+
+sim_heatmap.df <- as.data.frame(as.table(similarity_matrix)) %>%
+  rename(Var1 = "module_AD", Var2 = "module_noAD", Freq = "similarity")
+
+# Crear el heatmap
+sim_heatmap.p <- tidyheatmap(
+  df = sim_heatmap.df,
+  rows = module_AD,
+  columns = module_noAD,
+  values = similarity,
+  scale = "none", # No queremos escalado adicional
+  clustering_method = "average", # Opcional: Método de clustering
+  annotation_col = NULL,    # Opcional: Anotaciones en columnas si es necesario
+  annotation_row = NULL,     # Opcional: Anotaciones en filas si es necesario
+  colors =  c("navy", "white", "firebrick"), 
+  main = "Gene module correspondence"
+)
+
+ggsave(
+  "sim_genes_heatmap.pdf",
+  plot = sim_heatmap.p,
+  device = "pdf",
+  width = 15,
+  height = 10,
+  units = "in",
+  dpi = 300
+)
+
+#Compare modularity between graphs, applying 
+#variation of information "vi"
+#normalized mutual information "nmi"
+#split-join distance "split-join distance"
+#Rand index "Rand index"
+#adjusted Rand index "adjusted Rand index"
+
+possible_algos <- c("vi", "nmi", "split.join", "rand", "adjusted.rand")
+
+comparison_methods <- sapply(X = possible_algos, FUN = function(i){
+  igraph::compare(comm1 = graphAD_plus_modules,
+                  comm2 = graphnoAD_plus_modules,
+                  method = i
+  )
+})
+
+comparison_methods
 
 #In which modules are found our hub genes? --- ---
 
@@ -309,11 +376,11 @@ enriched_results_noAD <- lapply(enriched_results_noAD, replace_null) # Exchange 
 num_modules_AD <- length(enriched_results_AD)
 num_modules_noAD <- length(enriched_results_noAD)
 
-similarity_matrix <- matrix(NA, nrow = num_modules_AD, ncol = num_modules_noAD)
+similarity_matrix_enri <- matrix(NA, nrow = num_modules_AD, ncol = num_modules_noAD)
 
 # Assign row and column names
-rownames(similarity_matrix) <- paste("AD", 1:num_modules_AD, sep = "_")
-colnames(similarity_matrix) <- paste("noAD", 1:num_modules_noAD, sep = "_")
+rownames(similarity_matrix_enri) <- paste("AD", 1:num_modules_AD, sep = "_")
+colnames(similarity_matrix_enri) <- paste("control", 1:num_modules_noAD, sep = "_")
 
 #Iterate to obtain similarity matrix 
 
@@ -322,18 +389,55 @@ for (i in 1:num_modules_AD) {
     # Acceder a los geneSets de las redes AD y no AD
     geneSets_AD <- names(enriched_results_AD[[i]]@geneSets)
     geneSets_noAD <- names(enriched_results_noAD[[j]]@geneSets)
-    similarity_matrix[i, j] <- jaccard_simplex(geneSets_AD, geneSets_noAD)
+    similarity_matrix_enri[i, j] <- jaccard_simplex(geneSets_AD, geneSets_noAD)
   }
 }
 
-head(similarity_matrix)
+head(similarity_matrix_enri)
 
 #Find the highest similarity of the matrix  
-max(similarity_matrix, na.rm = TRUE)
+max(similarity_matrix_enri, na.rm = TRUE)
 
-#Network with this matrix
+length(similarity_matrix_enri[similarity_matrix_enri == 1])
 
-sim_node.g <- graph_from_adjacency_matrix(similarity_matrix, mode = "undirected", weighted = TRUE)
+length(similarity_matrix_enri[similarity_matrix_enri > 0.5])
+
+# Crear dataframe con los nombres de los módulos correspondientes
+module_pairs_enri <- data.frame(
+  module_AD = rownames(similarity_matrix_enri)[pairs_with_one[, "row"]],
+  module_noAD = colnames(similarity_matrix_enri)[pairs_with_one[, "col"]]
+)
+
+# Imprimir el dataframe corregido
+print(module_pairs_enri)
+
+sim_enri_heatmap.df <- as.data.frame(as.table(similarity_matrix_enri)) %>%
+  rename(Var1 = "module_AD", Var2 = "module_control", Freq = "similarity")
+
+# Crear el heatmap
+sim_enri_heatmap.p <- tidyheatmap(
+  df = sim_enri_heatmap.df,
+  rows = module_AD,
+  columns = module_control,
+  values = similarity,
+  scale = "none", # No queremos escalado adicional
+  clustering_method = "average", # Opcional: Método de clustering
+  annotation_col = NULL,    # Opcional: Anotaciones en columnas si es necesario
+  annotation_row = NULL,     # Opcional: Anotaciones en filas si es necesario
+  colors =  c("navy", "white", "firebrick"), 
+  main = "Biological Processes module correspondence"
+)
+
+ggsave(
+  "sim_enri_genes_heatmap.pdf",
+  plot = sim_enri_heatmap.p,
+  device = "pdf",
+  width = 15,
+  height = 10,
+  units = "in",
+  dpi = 300
+)
+
 
 #Number of modules in networks that have Jaccard index J=1 with a module of the Main network --- ---
 
@@ -343,10 +447,10 @@ count_ones <- function(row) {
 }
 
 # Apply the function to each row of the matrix
-ones_count <- apply(similarity_matrix, 1, count_ones)
+ones_count <- apply(similarity_matrix_enri, 1, count_ones)
 
 # Crear una tabla con los resultados
-num_equal_nodes <- data.frame(module_number = rownames(similarity_matrix), modules_with_jaccardindex1 = ones_count)
+num_equal_nodes <- data.frame(module_number = rownames(similarity_matrix_enri), modules_with_jaccardindex1 = ones_count)
 
 num_equal_nodes.x <- num_equal_nodes %>% filter(modules_with_jaccardindex1 ==1)
 dim(num_equal_nodes.x)
@@ -354,48 +458,230 @@ dim(num_equal_nodes.x)
 
 #This answers the question of 1. How similar are the sets of biological functions that are associated to the whole network, through the enrichment of individual modules?
   
+#TABLE
+
+# Función para contar genes y procesos enriquecidos
+count_genes_and_processes <- function(enrichment_results) {
+  # Lista para almacenar los resultados
+  results_summary <- list()
+  
+  for (i in seq_along(enrichment_results)) {
+    # Obtener el número de genes (esto asume que cada elemento tiene una lista de genes)
+    num_genes <- length(enrichment_results[[i]]@gene)
+    
+    # Número de procesos enriquecidos (filtrados por pvalue significativo)
+    if (nrow(enrichment_results[[i]]) > 0) {
+      num_processes <- nrow(enrichment_results[[i]]@result[enrichment_results[[i]]@result$pvalue < 0.05, ])
+    } else {
+      num_processes <- 0
+    }
+    
+    # Almacenar el resultado por comunidad
+    results_summary[[i]] <- list(
+      "num_genes" = num_genes,
+      "num_processes" = num_processes
+    )
+  }
+  return(results_summary)
+}
+
+# Resumen de enriquecimiento para AD y noAD
+summary_AD <- count_genes_and_processes(enriched_results_AD)
+summary_noAD <- count_genes_and_processes(enriched_results_noAD)
+
+communities_AD <- names(nodes_by_community_AD)
+communities_noAD <- names(nodes_by_community_noAD)
+
+# Convertir los resultados a un data frame
+df_AD <- data.frame(
+  Community = communities_AD,
+  Category = "AD",
+  Number_of_Genes = sapply(summary_AD, function(x) x$num_genes),
+  Number_of_Enriched_Processes = sapply(summary_AD, function(x) x$num_processes)
+)
+
+
+df_noAD <- data.frame(
+  Community = communities_noAD,
+  Category = "noAD",
+  Number_of_Genes = sapply(summary_noAD, function(x) x$num_genes),
+  Number_of_Enriched_Processes = sapply(summary_noAD, function(x) x$num_processes)
+)
+
+# Combinar ambas tablas en una sola
+df_summary <- bind_rows(df_AD, df_noAD)
+
 #Number of modules associated to a given biological function --- ---
 
 #3.In how many modules is represented each biological process?
 
-# Define a function to extract the biological processes (GO terms) from an enrichment result
-extract_bp_terms <- function(enrich_result) {
-  if (is.null(enrich_result@result)) return(character(0)) # Handle empty enrichment results
-  bp_terms <- enrich_result@result$Description # Extract Biological Process (BP) terms
-  return(bp_terms)
-}
+# Extraer los términos GO para cada módulo en AD
+BP_terms_AD <- lapply(enriched_results_AD, function(result) {
+  if (length(result@result) > 0) {
+    return(result@result$Description)  # Extraer nombres de procesos biológicos
+  } else {
+    return(NA)  # Manejar módulos sin resultados
+  }
+})
 
-# Combine both AD and noAD enrichment results
-combined_enrichment_results <- c(enriched_results_AD, enriched_results_noAD)
+# Extraer los términos GO para cada módulo en noAD
+BP_terms_noAD <- lapply(enriched_results_noAD, function(result) {
+  if (length(result@result) > 0) {
+    return(result@result$Description)
+  } else {
+    return(NA)
+  }
+})
 
-# Create a list to store the modules for each biological process
-biological_process_modules <- list()
+# Contar cuántos módulos están asociados a cada proceso biológico en AD
+BP_count_AD <- table(unlist(BP_terms_AD)) %>% as.data.frame()
+colnames(BP_count_AD) <- c("term", "in_modules_AD")
 
-# Loop through each module's enrichment result
-for (i in seq_along(combined_enrichment_results)) {
-  # Extract the biological process terms for the current module
-  bp_terms <- extract_bp_terms(combined_enrichment_results[[i]])
+# Contar cuántos módulos están asociados a cada proceso biológico en noAD
+BP_count_noAD <- table(unlist(BP_terms_noAD)) %>% as.data.frame()
+colnames(BP_count_noAD) <- c("term", "in_modules_noAD")
+
+# Unificar los términos de procesos biológicos de ambas redes
+all_BP_terms <- BP_count_AD %>% left_join(BP_count_noAD, by = "term")
+all_BP_terms[is.na(all_BP_terms)] <- 0  # Reemplazar NA por 0
+# Calcular la diferencia absoluta entre AD y noAD
+all_BP_terms <- all_BP_terms %>%
+  mutate(difference = abs(in_modules_AD - in_modules_noAD))
+
+# Seleccionar los 20 términos con la mayor diferencia
+top_diff_BP_terms <- all_BP_terms %>%
+  arrange(desc(difference)) %>%
+  head(30)
+
+diff_BP_terms.p <- ggplot(top_diff_BP_terms, aes(x = reorder(term, difference))) +  # Reordenar según la diferencia en orden descendente
+  geom_col(aes(y = in_modules_AD, fill = "AD", alpha = 0.8), stat = "identity", position = "dodge") +
+  geom_col(aes(y = in_modules_noAD, fill = "control", alpha = 0.8), stat = "identity", position = "dodge") +
+  coord_flip() + 
+  theme_minimal() +
+  labs(x = "Biological Process (GO:BP)", y = "Number of Modules", fill = "Network") +
+  ggtitle("Top 20 Biological Processes with Largest Differences (AD vs control)")+
+  scale_fill_manual(values = c("AD" = "red", "control" = "blue"))  # Colores personalizados
+diff_BP_terms.p
+
+diff_BP_terms.p <- ggplot(top_diff_BP_terms, aes(x = reorder(term, difference))) +  
+  geom_point(aes(y = in_modules_AD, color = "AD"), size = 4, alpha = 0.8) +
+  geom_point(aes(y = in_modules_noAD, color = "control"), size = 4, alpha = 0.8) +
+coord_flip() +
+geom_segment(aes(xend = term, y = in_modules_AD, yend = 0, color = "AD"), size = 1, alpha = 0.8) +
+  geom_segment(aes(xend = term, y = in_modules_noAD, yend = 0, color = "control"), size = 1, alpha = 0.8) +
+  theme_minimal() +
+  labs(x = "Biological Process (GO:BP)", y = "Number of Modules in which they are represented", color = "Network") +
+  ggtitle("Top 20 Biological Processes with Largest Differences (AD vs control)") +
+  scale_color_manual(values = c("AD" = "red", "control" = "blue"))  # Colores personalizados
+diff_BP_terms.p
+
+#Save plot
+
+ggsave(filename = "diff_BP_terms.jpg",
+       plot = diff_BP_terms.p,
+       device = "jpg", width = 25,
+       height = 20, units = "cm",dpi = 300)
+
+# Asumamos que tienes un objeto llamado 'enriched_results' con los procesos enriquecidos
+
+# Generar una lista con las conexiones entre módulos y procesos GO
+network_edges <- data.frame()
+
+for (i in seq_along(enriched_results_AD)) {
+  module_name <- names(nodes_by_community_AD)[i]  # Nombre de la comunidad o módulo
+  go_terms <- enriched_results_AD[[i]]@result$ID  # Procesos GO significativos para esa comunidad
   
-  # Count the occurrence of each biological process and track the module it appears in
-  for (bp in bp_terms) {
-    if (!is.null(biological_process_modules[[bp]])) {
-      biological_process_modules[[bp]]$modules <- c(biological_process_modules[[bp]]$modules, i)
-      biological_process_modules[[bp]]$count <- biological_process_modules[[bp]]$count + 1
-    } else {
-      biological_process_modules[[bp]] <- list(modules = i, count = 1)
+  if (length(go_terms) > 0) {
+    for (go in go_terms) {
+      network_edges <- rbind(network_edges, data.frame(Module = module_name, GO = go))
     }
   }
 }
 
-# Convert the result to a data frame for easier viewing
-biological_process_summary <- data.frame(
-  Biological_Process = names(biological_process_modules),
-  Module_Count = sapply(biological_process_modules, function(x) x$count),
-  Modules = sapply(biological_process_modules, function(x) paste(x$modules, collapse = ", "))
+# Crear el grafo a partir de los datos
+g <- graph_from_data_frame(network_edges, directed = FALSE)
+
+# Agregar propiedades a los nodos: si es un módulo o un GO term
+V(g)$type <- ifelse(V(g)$name %in% names(nodes_by_community_AD), "Module", "GO Term")
+
+# Colores para módulos y GO terms
+module_color <- "dodgerblue"  # Color para módulos
+go_color <- "orange"          # Color para GO terms
+
+# Crear el gráfico
+ggraph(g, layout = "fr") +  # Fruchterman-Reingold layout para redes
+  geom_edge_link(aes(edge_alpha = 0.5), color = "gray", show.legend = FALSE) +  # Enlaces
+  geom_node_point(aes(color = V(g)$type), size = 5) +  # Nodos
+  geom_node_text(aes(label = V(g)$name), repel = TRUE, size = 3) +  # Etiquetas
+  scale_color_manual(values = c("Module" = module_color, "GO Term" = go_color)) +  # Asignar colores
+  theme_void() +  # Sin fondo
+  theme(legend.position = "none")  # Sin leyenda
+
+# Si ya tienes los datos de enriquecimiento para cada módulo, puedes ordenarlos por número de genes o procesos
+# Supongamos que summary_AD y summary_noAD ya contienen el conteo de genes y procesos enriquecidos como antes
+
+# Crear un data frame que contenga la información sobre los módulos y sus genes/procesos
+df_AD <- data.frame(
+  Module = names(nodes_by_community_AD),
+  Number_of_Genes = sapply(summary_AD, function(x) x$num_genes),
+  Number_of_Enriched_Processes = sapply(summary_AD, function(x) x$num_processes)
 )
 
-# Display the result
-print(biological_process_summary)
+df_noAD <- data.frame(
+  Module = names(nodes_by_community_noAD),
+  Number_of_Genes = sapply(summary_noAD, function(x) x$num_genes),
+  Number_of_Enriched_Processes = sapply(summary_noAD, function(x) x$num_processes)
+)
 
+# Ordenar por número de procesos enriquecidos o número de genes
+df_AD <- df_AD[order(-df_AD$Number_of_Enriched_Processes), ]
+df_noAD <- df_noAD[order(-df_noAD$Number_of_Enriched_Processes), ]
 
+# Quedarse con los primeros 20 módulos de cada red
+top_modules_AD <- df_AD[1:5, ]
+top_modules_noAD <- df_noAD[1:5, ]
 
+# Filtrar los resultados de enriquecimiento para los top módulos
+filtered_enrichment_AD <- enriched_results_AD[names(enriched_results_AD) %in% top_modules_AD$Module]
+filtered_enrichment_noAD <- enriched_results_noAD[names(enriched_results_noAD) %in% top_modules_noAD$Module]
+# Generar una lista con las conexiones entre módulos filtrados y procesos GO
+network_edges_filtered <- data.frame()
+
+# Para AD
+for (i in seq_along(filtered_enrichment_AD)) {
+  module_name <- names(filtered_enrichment_AD)[i]  # Nombre de la comunidad o módulo
+  go_terms <- filtered_enrichment_AD[[i]]@result$ID  # Procesos GO significativos para esa comunidad
+  
+  if (length(go_terms) > 0) {
+    for (go in go_terms) {
+      network_edges_filtered <- rbind(network_edges_filtered, data.frame(Module = module_name, GO = go))
+    }
+  }
+}
+
+# Para noAD (control)
+for (i in seq_along(filtered_enrichment_noAD)) {
+  module_name <- names(filtered_enrichment_noAD)[i]  # Nombre de la comunidad o módulo
+  go_terms <- filtered_enrichment_noAD[[i]]@result$ID  # Procesos GO significativos para esa comunidad
+  
+  if (length(go_terms) > 0) {
+    for (go in go_terms) {
+      network_edges_filtered <- rbind(network_edges_filtered, data.frame(Module = module_name, GO = go))
+    }
+  }
+}
+
+# Crear el grafo filtrado
+g_filtered <- graph_from_data_frame(network_edges_filtered, directed = FALSE)
+
+# Agregar propiedades a los nodos: si es un módulo o un GO term
+V(g_filtered)$type <- ifelse(V(g_filtered)$name %in% c(top_modules_AD$Module, top_modules_noAD$Module), "Module", "GO Term")
+
+# Visualización usando ggraph (ver los pasos anteriores para detalles de visualización)
+ggraph(g_filtered, layout = "fr") +  # Fruchterman-Reingold layout para redes
+  geom_edge_link(aes(edge_alpha = 0.5), color = "gray", show.legend = FALSE) +  # Enlaces
+  geom_node_point(aes(color = V(g_filtered)$type), size = 5) +  # Nodos
+  geom_node_text(aes(label = V(g_filtered)$name), repel = TRUE, size = 3) +  # Etiquetas
+  scale_color_manual(values = c("Module" = module_color, "GO Term" = go_color)) +  # Asignar colores
+  theme_void() +  # Sin fondo
+  theme(legend.position = "none")  # Sin leyenda

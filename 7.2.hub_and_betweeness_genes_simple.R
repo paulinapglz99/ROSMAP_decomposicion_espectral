@@ -68,11 +68,13 @@ AD_hubs_notcontrol_enrichment <- enrichGO(
   OrgDb = "org.Hs.eg.db", 
   keyType = 'ENSEMBL',
   readable = TRUE,
-  ont = "BP",          #type of GO(Biological Process (BP), cellular Component (CC), Molecular Function (MF)
+  universe = universe,
+  ont = "MF",          #type of GO(Biological Process (BP), cellular Component (CC), Molecular Function (MF)
   pvalueCutoff = 0.05, 
   qvalueCutoff = 0.10)
 
 AD_hubs_notcontrol_enrichment.df <- as.data.frame(AD_hubs_notcontrol_enrichment)
+AD_hubs_notcontrol_enrichment.df
 
 #Plot enrichment of hubs
 
@@ -114,6 +116,14 @@ hub_subgraph.p
 
 write_graph(hub_subgraph, file = '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/ROSMAP_RNAseq_DLPFC_AD_hubs_induced_subgraph.graphml',
              format = "graphml")
+
+#Enrichment with KEGG
+
+kk <- enrichKEGG(gene = AD_hubs_notcontrol,
+                 organism = 'hsa',
+                 keyType = 'ENSEMBL',
+                 pvalueCutoff = 0.05, 
+                 universe = universe)
 
 ##### HIGH BETWEENESS GENES ####
 
