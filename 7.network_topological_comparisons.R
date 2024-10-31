@@ -50,6 +50,25 @@ graphLists <- list(graphAD = graphAD,
 
 #Network topological comparison --- --- 
 
+# Extraer los nombres de los nodos de cada red
+nodes_AD <- V(graphAD)$name
+nodes_noAD <- V(graphnoAD)$name
+
+# Encontrar los nodos comunes
+common_nodes <- intersect(nodes_AD, nodes_noAD)
+num_common_nodes <- length(common_nodes)
+
+# Calcular el porcentaje de coincidencia respecto a cada red
+percent_common_AD <- (num_common_nodes / length(nodes_AD)) * 100
+percent_common_noAD <- (num_common_nodes / length(nodes_noAD)) * 100
+
+# Imprimir resultados
+cat("Número de nodos en común:", num_common_nodes, "\n")
+cat("Porcentaje de nodos en común en la red g1:", percent_common_AD, "%\n")
+cat("Porcentaje de nodos en común en la red g2:", percent_common_noAD, "%\n")
+
+jaccard_nodes(graphAD, graphnoAD)
+
 #Calculate diameter of both graphs --- --- 
 
 diameter <- sapply(X = graphLists, FUN = diameter)
