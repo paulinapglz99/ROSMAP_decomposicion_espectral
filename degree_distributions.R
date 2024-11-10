@@ -56,7 +56,7 @@ noADdegree_freq <- noADdegree_freq[order(noADdegree_freq$degree, decreasing = F)
 noADdegree_freq$CumulativeDegree <- cumsum(noADdegree_freq$Freq)
 # Logarithm of the cumulative sum
 noADdegree_freq$logCumulativeDegree <- log10(noADdegree_freq$CumulativeDegree)
-noADdegree_freq$dx<- "no AD"
+noADdegree_freq$dx<- "control"
 noADdegree_freq$degree <- as.numeric(noADdegree_freq$degree)
 
 # Find the max value of "Freq" in both networks
@@ -108,7 +108,7 @@ degree_dis <- grid.arrange(degree_disAD, degree_disnoAD, ncol =1 )
 
 log_log_AD <- ggplot(ADdegree_freq, aes(x = degree, y = Prob)) +
   geom_point(color = "blue", size = 2, alpha = 0.8) +  # Puntos más grandes y semitransparentes
- scale_x_log10() +  # Escala logarítmica en el eje x
+  scale_x_log10() +  # Escala logarítmica en el eje x
   scale_y_log10() +  # Escala logarítmica en el eje y
   labs(x = expression("log<k>"), y = expression(logp(k)), 
        title = "", 
@@ -130,7 +130,7 @@ log_log_noAD <-  ggplot(noADdegree_freq, aes(x = degree, y = Prob)) +
  scale_y_log10() + 
   labs(x = expression("log<k>"), y = expression(logp(k)), 
        title = "", 
-       subtitle = "No AD network \ndegree distribution") +
+       subtitle = "Control network \ndegree distribution") +
   geom_smooth(method = "lm", se = FALSE, color = "black", linetype = "dashed", 
                size = 1.2, formula = y ~ x) +  # Ajuste lineal con estilo modificado
   theme_minimal(base_size = 14) +  # Tamaño base de texto para mejor legibilidad
@@ -142,6 +142,38 @@ log_log_noAD <-  ggplot(noADdegree_freq, aes(x = degree, y = Prob)) +
   )
 
 log_grid <- grid.arrange(log_log_AD, log_log_noAD, ncol =2)
+
+#Encontrar gammas
+
+# Asegurarse de que los datos estén en la escala correcta
+# Se toman logaritmos de los valores de k y P(k)
+ADdegree_freq$log_degree <- log(ADdegree_freq$degree)
+ADdegree_freq$log_Prob <- log(ADdegree_freq$Prob)
+
+# Ajuste de regresión lineal en escala log-log
+ajuste_AD <- lm(log_Prob ~ log_degree, data = ADdegree_freq)
+
+# Mostrar los resultados del ajuste
+summary(ajuste_AD)
+
+# Calcular el valor de gamma (la pendiente negativa de la regresión)
+gamma_AD <- -coef(ajuste)["log_degree"]
+cat("El valor de gamma para AD es:", gamma_AD, "\n")
+
+#control
+
+noADdegree_freq$log_degree <- log(noADdegree_freq$degree)
+noADdegree_freq$log_Prob <- log(noADdegree_freq$Prob)
+
+# Ajuste de regresión lineal en escala log-log
+ajuste_noAD <- lm(log_Prob ~ log_degree, data = noADdegree_freq)
+
+# Mostrar los resultados del ajuste
+summary(ajuste_noAD)
+
+# Calcular el valor de gamma (la pendiente negativa de la regresión)
+gamma_noAD <- -coef(ajuste_noAD)["log_degree"]
+cat("El valor de gamma noAD es:", gamma_noAD, "\n")
 
 # ggsave(filename = "degree_dis_loglog.jpg",
 #        plot = log_grid,
@@ -163,13 +195,21 @@ log_log_combined <- ggplot(dis, aes(x = degree, y = Prob, color = dx)) +
   geom_smooth(method = "lm", se = FALSE, linetype = "longdash", 
               size = 1.2, aes(color = dx), formula = y ~ x) +  # Ajuste lineal con colores diferenciados
   theme_minimal(base_size = 14) +  # Tamaño base de texto para mejor legibilidad
+  annotate("text", 
+           x = min(dis$degree) * 1.1,           # Ajusta cerca del límite inferior del eje x
+           y = min(dis$Prob) * 1.1,             # Ajusta cerca del límite inferior del eje y
+           label = "γcontrol = 0.7584 \n γAD = 0.7908", 
+           color = "black", 
+           size = 5, 
+           vjust = 1,                # Ajusta la posición vertical
+           hjust = 0)  +              # Ajusta la posición horizontal
   theme(
     axis.title = element_text(size = 14),  # Tamaño de títulos de ejes
     axis.text = element_text(size = 12),   # Tamaño de etiquetas de ejes
     panel.grid = element_line(size = 0.5, color = "grey80")  # Líneas de cuadrícula más sutiles
   ) +
-  scale_color_manual(values = c("AD" = "blue", "No AD" = "red")) +
-  theme(legend.position = "none" )
+  scale_color_manual(values = c("AD" = "blue", "Control" = "red")) +
+  theme(legend.position = "none")
 
 # Mostrar el gráfico
 log_log_combined
@@ -193,7 +233,7 @@ degree_distr_x.p <- ggplot(dis, aes(x = as.numeric(degree), y = as.numeric(Cumul
        y = "Cumulative Degree", 
        color = NULL) +  # Elimina el título de la leyenda
   #scale_x_continuous(breaks = seq(1, max(dis$degree), by =4)) + # Adjust the x-axis to show only integer degrees
-  scale_color_manual(values = c("AD" = "#A3333D", "no AD" = "#477998")) + # Custom colors for AD and no AD
+  scale_color_manual(values = c("AD" = "#A3333D", "control" = "#477998")) + # Custom colors for AD and no AD
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +  # Rotate X-axis labels at 45 degrees
   theme_classic() +
   theme(
@@ -232,8 +272,7 @@ ggsave(filename = "degree_dis_inset.jpg",
        width = 25,
        height = 25,
        units = "cm",
-       dpi = 300,
-)
+       dpi = 300)
 
 ###########  k vs P(k) distribution ########
 
@@ -304,8 +343,6 @@ k_logpk_noAD <-  ggplot(noADdegree_freq, aes(x = degree, y = Prob)) +
   )
 
 k_pk_grid <- grid.arrange(k_logpk_AD, k_logpk_noAD, ncol =2)
-
-
 
 #Final panel
 

@@ -220,10 +220,4 @@ comparison_methods <- sapply(X = possible_algos, FUN = function(i){
 
 comparison_methods
 
-#           vi           nmi    split.join          rand adjusted.rand 
-#3.539291e+00  5.624657e-01  1.355000e+03  8.480256e-01  5.993397e-02 
-
-# vi           nmi    split.join          rand adjusted.rand   <- 
-#4.055584e+00  5.614082e-01  2.819000e+03  8.784207e-01  4.885023e-02
-
 #END
