@@ -34,16 +34,19 @@ calculate_metrics_random_graphs <- function(graph_list) {
 
 #Function to plot any metric -----
 
-plot_metric_distribution <- function(random_metrics, observed_metric, metric_name, graph_type) {
-  random_df <- data.frame(value = random_metrics, type = paste0("Random (", graph_type, ")")) # Df of random variables
-  observed_df <- data.frame(value = observed_metric, type = paste0("Observed (", graph_type, ")"))   # Observed value
-  combined_df <- rbind(random_df, observed_df)   # Combine data frames
+plot_metric_distribution <- function(random_metrics, observed_metric, metric_name, graph_type, ci_lower, ci_upper) {
+  random_df <- data.frame(value = random_metrics, type = paste0("Random (", graph_type, ")")) # DataFrame de valores randomizados
+  observed_df <- data.frame(value = observed_metric, type = paste0("Observed (", graph_type, ")"))   # Valor observado
+  combined_df <- rbind(random_df, observed_df)   # Combina los DataFrames
+  
   # Plot
   ggplot(random_df, aes(x = value)) +
     geom_histogram(aes(y = ..density..), binwidth = 0.001, fill = "lightblue", color = "black", alpha = 0.7) +
     geom_density(color = "blue", lwd = 1) +
     geom_vline(aes(xintercept = observed_metric), color = "red", linetype = "dashed", size = 0.8) +
-    labs(title = paste(metric_name, "(",graph_type,")"), 
+    geom_vline(aes(xintercept = ci_lower), color = "darkgreen", linetype = "dotted", size = 0.8) +  # Línea para el límite inferior del IC
+    geom_vline(aes(xintercept = ci_upper), color = "darkgreen", linetype = "dotted", size = 0.8) +  # Línea para el límite superior del IC
+    labs(title = paste(metric_name, "(", graph_type, ")"), 
          x = metric_name, 
          y = "Density") + 
     theme_minimal()
@@ -73,30 +76,18 @@ metrics_noAD_random <- calculate_metrics_random_graphs(random_graphs_noAD)
 
 # Extract metrics -----
 
-# Extract clustering coefficient
+# 1. Extract clustering coefficient
 clustering_AD_random <- sapply(metrics_AD_random, function(x) x$clustering)
 clustering_noAD_random <- sapply(metrics_noAD_random, function(x) x$clustering)
-
-# Plot clustering coefficient distribution
-clust_AD <- plot_metric_distribution(clustering_AD_random, metrics_AD$clustering, "Clustering Coefficient", "AD")
-clust_noAD <- plot_metric_distribution(clustering_noAD_random, metrics_noAD$clustering, "Clustering Coefficient", "control")
 
 # Extract average path length 
 
 asort_AD_random <- sapply(metrics_AD_random, function(x) x$assortativity)
 asort_noAD_random <- sapply(metrics_noAD_random, function(x) x$assortativity)
 
-# Plot clustering average path length
-asort_AD <- plot_metric_distribution(path_length_AD_random, metrics_AD$assortativity, "Assortativity", "AD")
-asort_noAD <- plot_metric_distribution(path_length_noAD_random, metrics_noAD$assortativity, "Assortativity", "control")
-
 # Extract modularity for the random networks (AD and noAD)
 modularity_AD_random <- sapply(metrics_AD_random, function(x) x$modularity)
 modularity_noAD_random <- sapply(metrics_noAD_random, function(x) x$modularity)
-
-# Plot clustering average path length
-modu_AD <- plot_metric_distribution(modularity_AD_random, metrics_AD$modularity, "Modularity", "AD")
-modu_noAD <- plot_metric_distribution(modularity_noAD_random, metrics_noAD$modularity, "Modularity", "control")
 
 # Confidence invtervals
 
@@ -135,6 +126,67 @@ print(metrics_AD$modularity)
 print(modu_ci_noAD)
 print(metrics_noAD$modularity)
 
+# Plot clustering, modularity and assortativity
+
+#Modularity
+
+modu_AD <- plot_metric_distribution(
+  random_metrics = modularity_AD_random,
+  observed_metric = metrics_AD$modularity,
+  metric_name = "Modularity",
+  graph_type = "AD",
+  ci_lower = modu_ci_AD[1],
+  ci_upper = modu_ci_AD[2]
+)
+  
+modu_noAD <-  plot_metric_distribution(
+  random_metrics = modularity_noAD_random,
+  observed_metric = metrics_noAD$modularity,
+  metric_name = "Modularity",
+  graph_type = "control",
+  ci_lower = modu_ci_noAD[1],
+  ci_upper = modu_ci_noAD[2]
+)
+
+# Clustering
+#AD
+clust_AD <- plot_metric_distribution(
+  random_metrics = clustering_AD_random,
+  observed_metric = metrics_AD$clustering,
+  metric_name = "Clustering Coefficient",
+  graph_type = "AD",
+  ci_lower = clustering_ci_AD[1],
+  ci_upper = clustering_ci_AD[2]
+)
+#noAD
+clust_noAD <- plot_metric_distribution(
+  random_metrics = clustering_noAD_random,
+  observed_metric = metrics_noAD$clustering,
+  metric_name = "Clustering Coefficient",
+  graph_type = "control",
+  ci_lower = clustering_ci_noAD[1],
+  ci_upper = clustering_ci_noAD[2]
+)
+
+# Asortativity
+#AD
+asort_AD <- plot_metric_distribution(
+  random_metrics = asort_AD_random,
+  observed_metric = metrics_AD$assortativity,
+  metric_name = "Assortativity",
+  graph_type = "AD",
+  ci_lower = aso_ci_AD[1],
+  ci_upper = aso_ci_AD[2]
+)
+#noAD
+asort_noAD <- plot_metric_distribution(
+  random_metrics = asort_noAD_random,
+  observed_metric = metrics_AD$assortativity,
+  metric_name = "Assortativity",
+  graph_type = "control",
+  ci_lower = aso_ci_noAD[1],
+  ci_upper = aso_ci_noAD[2]
+)
 
 # Función para calcular gamma a partir de la distribución de grados ----
 
@@ -182,42 +234,6 @@ gamma_noAD_observed <- calculate_gamma(graphnoAD)
 gamma_random_AD <- sapply(random_graphs_AD, calculate_gamma)
 gamma_random_noAD <- sapply(random_graphs_noAD, calculate_gamma)
 
-# Plot gamma distribution ----
-plot_gamma_distribution <- function(random_gammas, observed_gamma, graph_type) {
-  random_df <- data.frame(value = random_gammas, type = paste0("Random (", graph_type, ")"))
-  observed_df <- data.frame(value = observed_gamma, type = paste0("Observed (", graph_type, ")"))
-  combined_df <- rbind(random_df, observed_df)
-  
-  # Plot
-  ggplot(random_df, aes(x = value)) +
-    geom_histogram(aes(y = ..density..), binwidth = 0.01, fill = "lightblue", color = "black", alpha = 0.7) +
-    geom_density(color = "blue", lwd = 1) +
-    geom_vline(aes(xintercept = observed_gamma), color = "red", linetype = "dashed", size = 0.8) +
-    labs(title = paste("Gamma (", graph_type, ")"), 
-         x = "Gamma", 
-         y = "Density") + 
-    theme_minimal()
-}
-
-# Plot gamma distribution for AD and noAD
-gamma_AD_plot <- plot_gamma_distribution(gamma_random_AD, gamma_AD_observed, "AD")
-gamma_AD_plot
-gamma_noAD_plot <- plot_gamma_distribution(gamma_random_noAD, gamma_noAD_observed, "control")
-gamma_noAD_plot
-
-# Add gamma plots to grid
-grid_gamma <- grid.arrange(gamma_AD_plot, gamma_noAD_plot, ncol = 2, top = "Gamma Null Model")
-
-# Save the plot
-ggsave(
-  "gamma_null_model.jpg",
-  plot = grid_gamma,
-  device = "jpg",
-  width = 10,
-  height = 5,
-  units = "in",
-  dpi = 300
-)
 
 # Calculate 95% confidence intervals for gamma ----
 gamma_ci_AD <- quantile(gamma_random_AD, probs = c(0.025, 0.975))
@@ -229,14 +245,41 @@ cat("Observed Gamma (AD):", gamma_AD_observed, "\n")
 cat("95% CI for Gamma (control):", gamma_ci_noAD, "\n")
 cat("Observed Gamma (control):", gamma_noAD_observed, "\n")
 
+# Plot gamma distribution ----
+plot_gamma_distribution <- function(random_gammas, observed_gamma, graph_type, gamma_ci) {
+  random_df <- data.frame(value = random_gammas, type = paste0("Random (", graph_type, ")"))
+  observed_df <- data.frame(value = observed_gamma, type = paste0("Observed (", graph_type, ")"))
+  combined_df <- rbind(random_df, observed_df)
+  
+  # Plot
+  ggplot(random_df, aes(x = value)) +
+    geom_histogram(aes(y = ..density..), binwidth = 0.01, fill = "lightblue", color = "black", alpha = 0.7) +
+    geom_density(color = "blue", lwd = 1) +
+    geom_vline(aes(xintercept = observed_gamma), color = "red", linetype = "dashed", size = 0.8) +
+    # Add the confidence interval lines
+    geom_vline(aes(xintercept = gamma_ci[1]), color = "green", linetype = "dotted", size = 0.8) +
+    geom_vline(aes(xintercept = gamma_ci[2]), color = "green", linetype = "dotted", size = 0.8) +
+    labs(title = paste("Gamma (", graph_type, ")"), 
+         x = "Gamma", 
+         y = "Density") + 
+    theme_minimal()
+}
+
+# Plot gamma distribution for AD and noAD
+gamma_AD_plot <- plot_gamma_distribution(random_gammas = gamma_random_AD, observed_gamma = gamma_AD_observed, 
+                        graph_type = "AD", gamma_ci = gamma_ci_AD)
+gamma_AD_plot
+gamma_noAD_plot <- plot_gamma_distribution(random_gammas = gamma_random_noAD, observed_gamma = gamma_noAD_observed, 
+                                           graph_type = "control", gamma_ci = gamma_ci_noAD)
+gamma_noAD_plot
 
 #Grid null model
 
 grid_nullm <- grid.arrange(clust_AD, clust_noAD, 
                            asort_AD, asort_noAD, 
                            modu_AD, modu_noAD,
-                           gamma_AD_plot, gamma_ci_noAD,
-                           ncol = 2, top = "Null model for")
+                           gamma_AD_plot, gamma_noAD_plot,
+                           ncol = 2)
 
 ggsave(
   "null_model_grid.jpg",

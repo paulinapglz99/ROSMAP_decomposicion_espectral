@@ -342,7 +342,7 @@ enricher <- function(nodes_by_community) {
 }
 
 #These functions may print a " --> No gene can be mapped...." on the console. 
-#This happens when there are lists of genes that cannot be enriched. It will still generate a result
+#This happens when there are lists of genes that cannot be enriched. It will still generate an empty S4 object.
 
 # Define a function to replace NULL by an empty S4 object "enrichResult" to handle NULLs in the enrichment lists
 
@@ -378,7 +378,7 @@ num_modules_noAD <- length(enriched_results_noAD)
 
 similarity_matrix_enri <- matrix(NA, nrow = num_modules_AD, ncol = num_modules_noAD)
 
-# Assign row and column names
+#Assign row and column names
 rownames(similarity_matrix_enri) <- paste("AD", 1:num_modules_AD, sep = "_")
 colnames(similarity_matrix_enri) <- paste("control", 1:num_modules_noAD, sep = "_")
 
@@ -402,19 +402,17 @@ length(similarity_matrix_enri[similarity_matrix_enri == 1])
 
 length(similarity_matrix_enri[similarity_matrix_enri > 0.5])
 
-# Crear dataframe con los nombres de los módulos correspondientes
+# Create data frame with module names
 module_pairs_enri <- data.frame(
   module_AD = rownames(similarity_matrix_enri)[pairs_with_one[, "row"]],
   module_noAD = colnames(similarity_matrix_enri)[pairs_with_one[, "col"]]
 )
-
-# Imprimir el dataframe corregido
 print(module_pairs_enri)
 
 sim_enri_heatmap.df <- as.data.frame(as.table(similarity_matrix_enri)) %>%
   rename(Var1 = "module_AD", Var2 = "module_control", Freq = "similarity")
 
-# Crear el heatmap
+# Heatmap
 sim_enri_heatmap.p <- tidyheatmap(
   df = sim_enri_heatmap.df,
   rows = module_AD,
@@ -598,7 +596,7 @@ for (i in seq_along(enriched_results_AD)) {
   }
 }
 
-# Crear el grafo a partir de los datos
+#Create graph object from our network
 g <- graph_from_data_frame(network_edges, directed = FALSE)
 
 # Agregar propiedades a los nodos: si es un módulo o un GO term
@@ -671,7 +669,7 @@ for (i in seq_along(filtered_enrichment_noAD)) {
   }
 }
 
-# Crear el grafo filtrado
+#Filtered graph
 g_filtered <- graph_from_data_frame(network_edges_filtered, directed = FALSE)
 
 # Agregar propiedades a los nodos: si es un módulo o un GO term
