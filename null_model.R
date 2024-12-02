@@ -41,7 +41,7 @@ plot_metric_distribution <- function(random_metrics, observed_metric, metric_nam
   
   # Plot
   ggplot(random_df, aes(x = value)) +
-    geom_histogram(aes(y = ..density..), binwidth = 0.001, fill = "lightblue", color = "black", alpha = 0.7) +
+    geom_histogram(aes(y = ..density..), binwidth = 0.001, fill = "skyblue4", color = "black", alpha = 0.7) +
     geom_density(color = "blue", lwd = 1) +
     geom_vline(aes(xintercept = observed_metric), color = "red", linetype = "dashed", size = 0.8) +
     geom_vline(aes(xintercept = ci_lower), color = "darkgreen", linetype = "dotted", size = 0.8) +  # Línea para el límite inferior del IC
@@ -253,7 +253,7 @@ plot_gamma_distribution <- function(random_gammas, observed_gamma, graph_type, g
   
   # Plot
   ggplot(random_df, aes(x = value)) +
-    geom_histogram(aes(y = ..density..), binwidth = 0.01, fill = "lightblue", color = "black", alpha = 0.7) +
+    geom_histogram(aes(y = ..density..), binwidth = 0.01, fill = "skyblue4", color = "black", alpha = 0.7) +
     geom_density(color = "blue", lwd = 1) +
     geom_vline(aes(xintercept = observed_gamma), color = "red", linetype = "dashed", size = 0.8) +
     # Add the confidence interval lines
@@ -291,4 +291,4 @@ ggsave(
   dpi = 300
 )
 
-#END
+END

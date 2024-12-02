@@ -10,9 +10,43 @@ pacman::p_load('igraph',
                'gridExtra', 
                "ggVennDiagram", 
                "clusterProfiler", 
-               "ggraph")
+               "ggraph", 
+               "biomaRt")
 
 library("org.Hs.eg.db", character.only = TRUE)
+
+#Function to translate genes --- ---
+# Connecting to the Ensembl database through biomaRt
+mart <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+
+convert_ens_to_symbol <- function(ensembl_ids) {
+  getBM(attributes = c("ensembl_gene_id", "external_gene_name", "chromosome_name"),
+        filters = "ensembl_gene_id",
+        values = ensembl_ids,
+        mart = mart)
+}
+
+translate_vertex_names <- function(graph) {
+  #Extract vertex names
+  graph_vnames <- V(graph)$name
+  
+  #Translate names
+  graph_vnames_trad <- convert_ens_to_symbol(graph_vnames)
+  
+  #Replace the missing values in the column 'external_gene_name' with the values of 'ensembl_gene_id'.
+  graph_vnames_trad$external_gene_name <- ifelse(graph_vnames_trad$external_gene_name == "", graph_vnames_trad$ensembl_gene_id, graph_vnames_trad$external_gene_name)
+  
+  # Create a vector of translated names using the dictionary
+  # We need to ensure that the actual names of the network are in the dictionary
+  graph_vnames_trad <- setNames(graph_vnames_trad$external_gene_name, graph_vnames_trad$ensembl_gene_id)
+  
+  # Sort graph_vnames_trad according to the order of graph_vnames
+  sorted_graph_vnames_trad <- graph_vnames_trad[match(graph_vnames, names(graph_vnames_trad))]
+  #Assign the new names to the network vertices.
+  V(graph)$name_trad <- sorted_graph_vnames_trad
+  
+  return(graph)
+}
 
 #Get data --- ---
 
@@ -53,6 +87,17 @@ shared_hub_genes <- intersect(hub_nodes[[1]], hub_nodes[[2]])
 AD_hubs_notcontrol <- setdiff(hub_nodes[[1]], hub_nodes[[2]])
 length(AD_hubs_notcontrol)
 
+AD_hubs_notcontrol.df1 <- data.frame(gene = names(nodes_degree$graphAD[names(nodes_degree$graphAD) %in% 
+                                                                        AD_hubs_notcontrol]),
+                                    degree = nodes_degree$graphAD[names(nodes_degree$graphAD) %in% 
+                                                                    AD_hubs_notcontrol]) 
+
+AD_hubs_notcontrol.df <- convert_ens_to_symbol(AD_hubs_notcontrol.df1$gene)
+
+
+AD_hubs_notcontrol.df <- AD_hubs_notcontrol.df %>%
+  left_join(AD_hubs_notcontrol.df1, by = c("ensembl_gene_id" = "gene")) %>% arrange(desc(degree))
+
 #Venn Diagram
 
 hubsvenn <- ggVennDiagram(list(AD = hub_nodes[[1]], C =  hub_nodes[[2]])) +
@@ -74,7 +119,6 @@ AD_hubs_notcontrol_enrichment <- enrichGO(
   qvalueCutoff = 0.10)
 
 AD_hubs_notcontrol_enrichment.df <- as.data.frame(AD_hubs_notcontrol_enrichment)
-AD_hubs_notcontrol_enrichment.df
 
 #Plot enrichment of hubs
 

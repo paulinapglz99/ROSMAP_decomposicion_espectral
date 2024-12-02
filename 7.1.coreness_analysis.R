@@ -10,14 +10,22 @@ pacman::p_load('tidyverse',
 
 #Read graph ----
 
-graph <- read.graph(file = "noMCI_17112023_graph_MI0.532.graphml",
+graph_0 <- read.graph(file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/ROSMAP_RNAseq_DLPFC_noAD_MutualInfograph_percentile99.99_trad.graphml",
                     format = "graphml")
+
+graph_1 <- read.graph(file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/ROSMAP_RNAseq_DLPFC_AD_MutualInfograph_percentile99.99_trad.graphml",
+                      format = "graphml")
+
+#List --- ---
+
+graphList <- list(graph_0 = graph_0, 
+                  graph_1 = graph_1 )
 
 #Cut by coreness ----
 
-coreness <- coreness(graph) %>% 
+coreness <- coreness(graph_0) %>% 
   as.data.frame() %>% 
-  rename("core_by_node" = ".") 
+  rename( "." = "core_by_node") 
 
 coreness$gene <- rownames(coreness)
 
@@ -48,6 +56,8 @@ hist_coreness_filter <- ggplot(coreness_filter, aes(x = core_by_node)) +
   scale_x_continuous(breaks = seq(0, max(coreness_filter$core_by_node), by = 10)) +
   theme_light()
 
+hist_coreness_filter
+
 #Now the subgraph ----
 
 # Create a vector with the name of nodes I want to subset
@@ -56,7 +66,7 @@ coreness_filter_v <- coreness_filter$gene
 
 #Making a subgraph only with the vertices of the core we want
 
-subgraph_kcore <- induced_subgraph(graph,
+subgraph_kcore <- induced_subgraph(graph_0,
                                    vids = coreness_filter_v)
 
 #Plot 

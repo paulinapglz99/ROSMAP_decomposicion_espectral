@@ -43,6 +43,7 @@ ADdegree_freq$CumulativeDegree <- cumsum(ADdegree_freq$Freq)
 ADdegree_freq$logCumulativeDegree <- log10(ADdegree_freq$CumulativeDegree)
 ADdegree_freq$dx <- "AD"
 ADdegree_freq$degree <- as.numeric(ADdegree_freq$degree)
+ADdegree_freq$CDF <- ADdegree_freq$CumulativeDegree / sum(ADdegree_freq$Freq) #Probabilidad acumulada
 
 #noAD
 
@@ -58,6 +59,7 @@ noADdegree_freq$CumulativeDegree <- cumsum(noADdegree_freq$Freq)
 noADdegree_freq$logCumulativeDegree <- log10(noADdegree_freq$CumulativeDegree)
 noADdegree_freq$dx<- "control"
 noADdegree_freq$degree <- as.numeric(noADdegree_freq$degree)
+noADdegree_freq$CDF <- noADdegree_freq$CumulativeDegree / sum(noADdegree_freq$Freq)
 
 # Find the max value of "Freq" in both networks
 max_freq_AD <- max(ADdegree_freq$Freq)
@@ -157,7 +159,7 @@ ajuste_AD <- lm(log_Prob ~ log_degree, data = ADdegree_freq)
 summary(ajuste_AD)
 
 # Calcular el valor de gamma (la pendiente negativa de la regresión)
-gamma_AD <- -coef(ajuste)["log_degree"]
+gamma_AD <- -coef(ajuste_AD)["log_degree"]
 cat("El valor de gamma para AD es:", gamma_AD, "\n")
 
 #control
@@ -221,6 +223,20 @@ ggsave(filename = "combined_degree_dis_loglog.jpg",
        units = "cm",
        dpi = 300,
 )
+
+#Prueba de significancia estadistica
+#Son mis distribuciones significativamente diferentes?
+
+# Crear funciones de distribución acumulativa
+AD_CDF <- approxfun(ADdegree_freq$degree, ADdegree_freq$CDF, method = "linear", yleft = 0, yright = 1)
+noAD_CDF <- approxfun(noADdegree_freq$degree, noADdegree_freq$CDF, method = "linear", yleft = 0, yright = 1)
+ks_result <- ks.test(AD_CDF(ADdegree_freq$degree), noAD_CDF(noADdegree_freq$degree))
+
+# Asymptotic two-sample Kolmogorov-Smirnov test
+# 
+# data:  AD_CDF(ADdegree_freq$degree) and noAD_CDF(noADdegree_freq$degree)
+# D = 0.037916, p-value = 0.9971
+# alternative hypothesis: two-sided
 
 #Cummulative degree
 

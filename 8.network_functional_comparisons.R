@@ -166,7 +166,6 @@ for (i in seq_along(graphLists)) {
 
 #If you already have the networks
 
-
 graphAD <- read_graph(file =  '~/redesROSMAP/graphADnodes_membership.graphml',
                       format = 'graphml')
 
@@ -179,6 +178,8 @@ universe <- scan(file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_ti
 
 graphLists <- list(graphAD = graphAD,
                    graphnoAD = graphnoAD)
+
+#Split lists of nodes by module
 
 #Plot networks
 # Attach communities to relevant vertices
@@ -195,27 +196,32 @@ graphLists <- lapply(graphLists, function(g) {
 
 # Extract list of nodes by community for each graph
 
-nodes_by_community_list <- lapply(seq_along(nodes_membership), function(i) {
-  split(V(graphLists[[i]])$name, nodes_membership[[i]])
+# nodes_by_community_list <- lapply(seq_along(nodes_membership), function(i) {
+#   split(V(graphLists[[i]])$name, nodes_membership[[i]])
+# })
+
+# Extraer los nodos por comunidad para cada grafo
+nodes_by_community_list <- lapply(graphLists, function(graph) {
+  split(V(graph)$name, V(graph)$community)
 })
 
-# Extraer los genes de cada módulo
-modules_AD <- split(nodes_membership_AD.df$ensembl_gene_id, nodes_membership_AD.df$membership)
-modules_noAD <- split(nodes_membership_noAD.df$ensembl_gene_id, nodes_membership_noAD.df$membership)
+# Extraer módulos para ambos grafos
+modules_AD <- nodes_by_community_list[[1]]
+modules_noAD <- nodes_by_community_list[[2]]
 
-# Crear la matriz de similitud
+# Crear matriz de similitud
 similarity_matrix <- matrix(0, nrow = length(modules_AD), ncol = length(modules_noAD))
 
-# Rellenar la matriz con los índices de similitud Jaccard
+# Rellenar matriz con índices Jaccard
 for (i in seq_along(modules_AD)) {
   for (j in seq_along(modules_noAD)) {
     similarity_matrix[i, j] <- jaccard_index(modules_AD[[i]], modules_noAD[[j]])
   }
 }
 
-# Nombrar filas y columnas según los módulos
+# Nombrar filas y columnas
 rownames(similarity_matrix) <- paste0("AD_", seq_along(modules_AD))
-colnames(similarity_matrix) <- paste0("control_", seq_along(modules_noAD))
+colnames(similarity_matrix) <- paste0("Control_", seq_along(modules_noAD))
 
 # Visualizar la matriz de similitud
 similarity_matrix
@@ -230,10 +236,12 @@ length(similarity_matrix[similarity_matrix == 1])
 #Is there any modules with moderate similitude?
 
 length(similarity_matrix[similarity_matrix > 0.5])
-#[1]
-
+#[1] 24
+ 
 # Buscar posiciones de valores iguales a 1
 pairs_with_one <- which(similarity_matrix == 1, arr.ind = TRUE)
+dim(pairs_with_one)
+#[1] 10  2
 
 # Crear dataframe con los nombres de los módulos correspondientes
 module_pairs <- data.frame(
@@ -263,16 +271,17 @@ sim_heatmap.p <- tidyheatmap(
   colors =  c("navy", "white", "firebrick"), 
   main = "Gene module correspondence"
 )
+sim_heatmap.p
 
-ggsave(
-  "sim_genes_heatmap.pdf",
-  plot = sim_heatmap.p,
-  device = "pdf",
-  width = 15,
-  height = 10,
-  units = "in",
-  dpi = 300
-)
+# ggsave(
+#   "sim_genes_heatmap.pdf",
+#   plot = sim_heatmap.p,
+#   device = "pdf",
+#   width = 15,
+#   height = 10,
+#   units = "in",
+#   dpi = 300
+# )
 
 #Compare modularity between graphs, applying 
 #variation of information "vi"
@@ -291,28 +300,6 @@ comparison_methods <- sapply(X = possible_algos, FUN = function(i){
 })
 
 comparison_methods
-
-#In which modules are found our hub genes? --- ---
-
-#Get hub genes 
-
-hub_genes <- scan("/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/AD_hubs_notcontrolens.txt",  what = character())
-
-hub_genes.x <- nodes_membership_AD.df %>% filter(ensembl_gene_id %in% hub_genes)
-
-hub_genes.xy <- convert_ens_to_symbol(hub_genes.x)
-
-hub_genes.x <- hub_genes.x %>% left_join(hub_genes.xy, by ="ensembl_gene_id")
-
-#In which modules are found our high betweeness genes?--- ---
-
-high_be_genes <-  scan(file = "/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/high_be_genes_en_AD_no_noAD_ens.txt",   what = character())
-
-high_be_genes.x <- nodes_membership_AD.df %>% filter(ensembl_gene_id %in% high_be_genes)
-
-high_be_genes.xy <- convert_ens_to_symbol(high_be_genes.x)
-
-high_be_genes.x <- high_be_genes.x %>% left_join(high_be_genes.xy, by ="ensembl_gene_id")
 
 #Enrichment to all modules of a network --- ----
 
@@ -399,8 +386,10 @@ head(similarity_matrix_enri)
 max(similarity_matrix_enri, na.rm = TRUE)
 
 length(similarity_matrix_enri[similarity_matrix_enri == 1])
+#[1] 25
 
 length(similarity_matrix_enri[similarity_matrix_enri > 0.5])
+#[1] 52
 
 # Create data frame with module names
 module_pairs_enri <- data.frame(
@@ -418,24 +407,23 @@ sim_enri_heatmap.p <- tidyheatmap(
   rows = module_AD,
   columns = module_control,
   values = similarity,
-  scale = "none", # No queremos escalado adicional
-  clustering_method = "average", # Opcional: Método de clustering
-  annotation_col = NULL,    # Opcional: Anotaciones en columnas si es necesario
-  annotation_row = NULL,     # Opcional: Anotaciones en filas si es necesario
+  scale = "none", #No aditional scaling
+  clustering_method = "average", # Clustering method
+  annotation_col = NULL,    #Column annotations
+  annotation_row = NULL,     #Rows annotations
   colors =  c("navy", "white", "firebrick"), 
   main = "Biological Processes module correspondence"
 )
 
-ggsave(
-  "sim_enri_genes_heatmap.pdf",
-  plot = sim_enri_heatmap.p,
-  device = "pdf",
-  width = 15,
-  height = 10,
-  units = "in",
-  dpi = 300
-)
-
+# ggsave(
+#   "sim_enri_genes_heatmap.pdf",
+#   plot = sim_enri_heatmap.p,
+#   device = "pdf",
+#   width = 15,
+#   height = 10,
+#   units = "in",
+#   dpi = 300
+# )
 
 #Number of modules in networks that have Jaccard index J=1 with a module of the Main network --- ---
 
@@ -456,6 +444,199 @@ dim(num_equal_nodes.x)
 
 #This answers the question of 1. How similar are the sets of biological functions that are associated to the whole network, through the enrichment of individual modules?
   
+# Extraer descripciones de los módulos de AD
+modulos_ad <- names(enriched_results_AD)
+funciones_ad <- sapply(modulos_ad, function(mod) {
+  enriched_results_AD[[mod]]@result$Description[1] # Obtener la función principal
+})
+
+funciones_ad <- sapply(modulos_ad, function(mod) {
+  if (!is.null(enriched_results_AD[[mod]]@result$Description[1])) {
+    enriched_results_AD[[mod]]@result$Description[1]  # Obtener la función principal
+  } else {
+    "Not enriched"  # Asignar un valor predeterminado si el resultado es NULL
+  }
+})
+
+# Construir el data frame
+tabla_modulos <- data.frame(
+  Modulo = paste0("AD_", modulos_ad),
+  Module_main_function = funciones_ad,
+  stringsAsFactors = FALSE
+)
+tabla_modulos$membership <- gsub("AD_", "", tabla_modulos$Modulo)
+
+# Generar un gráfico circular
+
+library(circlize)
+
+module_descriptions <- sapply(enriched_results_AD, function(res) res@result$Description[1])
+
+# Crear la matriz de similitud usando jaccard_simplex
+num_modules <- length(geneSets_AD)
+jaccard_matrix <- matrix(0, nrow = num_modules, ncol = num_modules,
+                         dimnames = list(module_descriptions, module_descriptions))
+
+for (i in seq_along(geneSets_AD)) {
+  for (j in seq_along(geneSets_AD)) {
+    jaccard_matrix[i, j] <- jaccard_simplex(geneSets_AD[[i]], geneSets_AD[[j]])
+  }
+}
+jaccard_matrix[is.na(jaccard_matrix)] <- 0
+
+normalized_matrix <- jaccard_matrix / max(jaccard_matrix)
+
+hc <- as.dendrogram(hclust(normalized_matrix))
+circlize_dendrogram(hc,
+                    labels_track_height = NA,
+                    dend_track_height = 0.5)
+
+dist_matrix <- as.dist(1 - similarity_matrix)  # Convertir similitud a distancia
+clustering <- hclust(dist_matrix, method = "ward.D2")
+
+################################################################################
+
+#Where are hub and high betweeness genes?
+#In which modules are found our hub genes? --- ---
+
+library(ggsankey)
+library(ggsankeyfier)
+
+#Get hub genes 
+
+hub_genes <- scan("/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/AD_hubs_notcontrolens.txt",
+                  what = character())
+
+hub_genes.x <- nodes_membership_AD.df %>% filter(ensembl_gene_id %in% hub_genes)
+
+hub_genes.xy <- convert_ens_to_symbol(hub_genes.x)
+
+hub_genes.x <- hub_genes.x %>% left_join(hub_genes.xy, by ="ensembl_gene_id")
+hub_genes.x <- merge(hub_genes.x, tabla_modulos[, c("membership", "Module_main_function")], by = "membership", all.x = TRUE)
+hub_genes.x[2, 3] <- "PDE4DIP Pseudogene"
+
+#hub_genes.x$chromosome_name <- as.factor(hub_genes.x$chromosome_name)
+unique(hub_genes.x$chromosome_name)
+
+hub_genes.x$chromosome_name <- factor(
+  hub_genes.x$chromosome_name,
+  levels = c("1", "2", "3", "6", "12", "17", "19"))
+
+
+hub_genes.x$chromosome_name <- factor(hub_genes.x$chromosome_name, levels = myOrder)
+hub_genes.x$external_gene_name <- as.factor(hub_genes.x$external_gene_name)
+hub_genes.x$Module_main_function <- as.factor(hub_genes.x$Module_main_function)
+hub_genes.x$membership <- as.factor(hub_genes.x$membership)
+
+# Convierte la tabla al formato largo necesario para ggsankey
+
+hub_genes_long <- hub_genes.x %>%
+  make_long(membership, external_gene_name, Module_main_function)
+
+sankey_hubs <- ggplot(hub_genes_long, aes(x = x, 
+                 next_x = next_x, 
+                 node = node, 
+                 next_node = next_node,
+                 fill = factor(node),
+                 label = node)) +
+  scale_x_discrete(labels = c("membership" = "Module membership",
+                              "external_gene_name" = "Gene", 
+                              "Module_main_function" = "Module main function"))+
+    geom_sankey(flow.alpha = 0.5, node.color = 1) +
+    geom_sankey_label(size = 3.5, color = 1, fill = "white") +
+  labs(x = " ")+
+    scale_fill_viridis_d(option = "A", alpha = 0.95) +
+    theme_sankey(base_size = 16) +
+    theme(legend.position = 'none')
+
+sankey_hubs
+
+##
+library(ggalluvial)
+
+allu_hubs <- ggplot(data = hub_genes.x,
+       aes(axis1 = chromosome_name, axis2 = external_gene_name, axis3 = Module_main_function)) +
+  geom_alluvium(aes(fill = membership)) +
+  geom_stratum() +
+  geom_text(stat = "stratum",
+            aes(label = after_stat(stratum))) +
+  scale_fill_viridis_d() +
+  theme_void()
+
+#In which modules are found our high betweeness genes?--- ---
+
+high_be_genes <-  scan(file = '/datos/rosmap/data_by_counts/ROSMAP_counts/counts_by_tissue/DLFPC/counts_by_NIA_Reagan/graphs_NIA_Reagan/AD_highbe_notcontrol_ens.txt',   what = character())
+
+high_be_genes.x <- nodes_membership_AD.df %>% filter(ensembl_gene_id %in% high_be_genes)
+
+high_be_genes.xy <- convert_ens_to_symbol(high_be_genes.x)
+
+high_be_genes.x <- high_be_genes.x %>% left_join(high_be_genes.xy, by ="ensembl_gene_id")
+high_be_genes.x <- merge(high_be_genes.x, tabla_modulos[, c("membership", "Module_main_function")], by = "membership", all.x = TRUE)
+
+high_be_genes.x [4,3]<- "(AURKA) Pseudogene"
+high_be_genes.x [7,3]<- "TXNRD1"
+high_be_genes.x [44,3]<-  "ENSG00000288049-001"
+high_be_genes.x$external_gene_name <- gsub(
+  pattern = "^detection of mechanical stimulus involved in sensory perception of pain",
+  replacement = "detection of mechanical stimulus involved \n in sensory perception of pain",
+  x = high_be_genes.x$external_gene_name
+)
+
+unique(high_be_genes.x$chromosome_name)
+
+high_be_genes.x$chromosome_name <- factor(
+  high_be_genes.x$chromosome_name,
+  levels = c(1, 2, 3, 4, 5, 6, 7, 10, 11, 12, 14, 15, 18, 19, 20, 22, "X", "Y"))
+
+#Parallel Coordinates chart
+
+high_be_genes.x$chromosome_name <- as.factor(high_be_genes.x$chromosome_name)
+high_be_genes.x$external_gene_name <- as.factor(high_be_genes.x$external_gene_name)
+high_be_genes.x$Module_main_function <- as.factor(high_be_genes.x$Module_main_function)
+high_be_genes.x$membership <- as.factor(high_be_genes.x$membership)
+
+#onvierte la tabla al formato largo necesario para ggsankey
+highbe_genes_long <- high_be_genes.x %>%
+  make_long(membership, external_gene_name, Module_main_function)
+
+sankey_highbe <- ggplot(highbe_genes_long, aes(x = x, 
+                                          next_x = next_x, 
+                                          node = node, 
+                                          next_node = next_node,
+                                          fill = factor(node),
+                                          label = node)) +
+  scale_x_discrete(labels = c("membership" = "Module membership", 
+                              "external_gene_name" = "Gene", 
+                              "Module_main_function" = "Module main function"))+
+  geom_sankey(flow.alpha = 0.5, node.color = 1) +
+  labs(x = "")+
+  geom_sankey_label(size = 3.5, color = 1, fill = "white") +
+  scale_fill_viridis_d(option = "A", alpha = 0.95) +
+  theme_sankey(base_size = 16) +
+  theme(legend.position = 'none')
+
+sankey_highbe
+
+allu_highbe <- ggplot(data = high_be_genes.x,
+       aes(axis1 = chromosome_name, axis2 = external_gene_name, axis3 = Module_main_function)) +
+  geom_alluvium(aes(fill = membership)) +
+  geom_stratum() +
+  geom_text(stat = "stratum",
+            aes(label = after_stat(stratum))) +
+  scale_fill_viridis_d() +
+  theme_void()
+
+
+#Grids
+
+grid.arrange(sankey_hubs, sankey_highbe, ncol = 2)
+
+
+grid.arrange(allu_hubs,allu_highbe, ncol = 2)
+
+################################################################################
+
 #TABLE
 
 # Función para contar genes y procesos enriquecidos
