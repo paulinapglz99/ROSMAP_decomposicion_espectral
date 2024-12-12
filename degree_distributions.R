@@ -238,6 +238,8 @@ ks_result <- ks.test(AD_CDF(ADdegree_freq$degree), noAD_CDF(noADdegree_freq$degr
 # D = 0.037916, p-value = 0.9971
 # alternative hypothesis: two-sided
 
+#. Con este valor p, no podemos concluir que las distribuciones son significativamente diferentes.
+
 #Cummulative degree
 
 degree_distr_x.p <- ggplot(dis, aes(x = as.numeric(degree), y = as.numeric(CumulativeDegree), color = dx)) +

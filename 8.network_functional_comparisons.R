@@ -518,8 +518,8 @@ hub_genes.x[2, 3] <- "PDE4DIP Pseudogene"
 #hub_genes.x$chromosome_name <- as.factor(hub_genes.x$chromosome_name)
 unique(hub_genes.x$chromosome_name)
 
-hub_genes.x$chromosome_name <- factor(
-  hub_genes.x$chromosome_name,
+hub_genes.x$membership <- factor(
+  hub_genes.x$membership,
   levels = c("1", "2", "3", "6", "12", "17", "19"))
 
 
@@ -577,10 +577,10 @@ high_be_genes.x <- merge(high_be_genes.x, tabla_modulos[, c("membership", "Modul
 high_be_genes.x [4,3]<- "(AURKA) Pseudogene"
 high_be_genes.x [7,3]<- "TXNRD1"
 high_be_genes.x [44,3]<-  "ENSG00000288049-001"
-high_be_genes.x$external_gene_name <- gsub(
+high_be_genes.x$Module_main_function <- gsub(
   pattern = "^detection of mechanical stimulus involved in sensory perception of pain",
-  replacement = "detection of mechanical stimulus involved \n in sensory perception of pain",
-  x = high_be_genes.x$external_gene_name
+  replacement = "detection of mechanical stimulus of pain",
+  x = high_be_genes.x$Module_main_function
 )
 
 unique(high_be_genes.x$chromosome_name)
@@ -609,9 +609,9 @@ sankey_highbe <- ggplot(highbe_genes_long, aes(x = x,
   scale_x_discrete(labels = c("membership" = "Module membership", 
                               "external_gene_name" = "Gene", 
                               "Module_main_function" = "Module main function"))+
-  geom_sankey(flow.alpha = 0.5, node.color = 1) +
+  geom_sankey(flow.alpha = 0.5, node.color = 1, node.width = 0.8) +
   labs(x = "")+
-  geom_sankey_label(size = 3.5, color = 1, fill = "white") +
+  geom_sankey_label(size = 3.5, fill = "white") +
   scale_fill_viridis_d(option = "A", alpha = 0.95) +
   theme_sankey(base_size = 16) +
   theme(legend.position = 'none')
@@ -630,10 +630,17 @@ allu_highbe <- ggplot(data = high_be_genes.x,
 
 #Grids
 
-grid.arrange(sankey_hubs, sankey_highbe, ncol = 2)
+sankeys <- grid.arrange(sankey_hubs, sankey_highbe, ncol = 2)
 
 
-grid.arrange(allu_hubs,allu_highbe, ncol = 2)
+ggsave("~/DLPFC_paper_plots/sankeys_hubs_highs.jpg", 
+       sankeys, device = "jpg", 
+       height = 10, 
+       width = 15, 
+       units = "in", 
+       dpi = 300
+        )
+
 
 ################################################################################
 
@@ -727,20 +734,36 @@ all_BP_terms[is.na(all_BP_terms)] <- 0  # Reemplazar NA por 0
 all_BP_terms <- all_BP_terms %>%
   mutate(difference = abs(in_modules_AD - in_modules_noAD))
 
+#Distribucion completa
+
+ggplot(all_BP_terms, aes(x = difference)) +
+  geom_histogram(binwidth = 1, fill = "cadetblue", color = "black", alpha = 0.6) +  # Bins más pequeños
+  scale_x_continuous(breaks = seq(0, max(all_BP_terms$difference), by = 1)) +  # Eje x de 1 en 1
+    labs(
+    title = "Distribution of absolute differences",
+    subtitle = "in the distribution of biological processes between the two models", 
+    x = "Absolute difference (number of modules)",
+    y = "Freq"
+  ) +
+  theme_minimal()
+
+
+# Gráfico de barras
+ggplot(all_BP_terms_long, aes(x = reorder(term, -count), y = count, fill = network)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    title = "Conteo de módulos asociados a procesos biológicos",
+    x = "Proceso biológico",
+    y = "Número de módulos",
+    fill = "Red"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_blank())
+
 # Seleccionar los 20 términos con la mayor diferencia
 top_diff_BP_terms <- all_BP_terms %>%
   arrange(desc(difference)) %>%
   head(30)
-
-diff_BP_terms.p <- ggplot(top_diff_BP_terms, aes(x = reorder(term, difference))) +  # Reordenar según la diferencia en orden descendente
-  geom_col(aes(y = in_modules_AD, fill = "AD", alpha = 0.8), stat = "identity", position = "dodge") +
-  geom_col(aes(y = in_modules_noAD, fill = "control", alpha = 0.8), stat = "identity", position = "dodge") +
-  coord_flip() + 
-  theme_minimal() +
-  labs(x = "Biological Process (GO:BP)", y = "Number of Modules", fill = "Network") +
-  ggtitle("Top 20 Biological Processes with Largest Differences (AD vs control)")+
-  scale_fill_manual(values = c("AD" = "red", "control" = "blue"))  # Colores personalizados
-diff_BP_terms.p
 
 diff_BP_terms.p <- ggplot(top_diff_BP_terms, aes(x = reorder(term, difference))) +  
   geom_point(aes(y = in_modules_AD, color = "AD"), size = 4, alpha = 0.8) +

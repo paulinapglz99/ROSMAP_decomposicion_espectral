@@ -25,6 +25,34 @@ summarize_by_tissue <- function(metadata, tissue_name) {
   return(tissue_data)
 }
 
+
+summarise_metadata <- function(data, group_var, fill_var, title, fill_labels = NULL) {
+  # Resumir los datos
+  sum_rosmap <- data %>%
+    select(tissue, all_of(fill_var)) %>%
+    mutate(across(all_of(fill_var), ~ ifelse(is.na(.), "NA", as.character(.)))) %>%
+    group_by(tissue, !!sym(fill_var)) %>%
+    summarise(count = n(), .groups = 'drop')
+  
+  # Si se proporcionan etiquetas de llenado, úsalas para recodificar
+  if (!is.null(fill_labels)) {
+    sum_rosmap <- sum_rosmap %>%
+      mutate(!!sym(fill_var) := recode(!!sym(fill_var), !!!fill_labels))
+  }
+  
+  # Crear el gráfico horizontal
+  plot <- ggplot(sum_rosmap, aes(x = count, y = tissue, fill = !!sym(fill_var))) +
+    geom_bar(stat = "identity") +
+    geom_text(aes(label = count), position = position_stack(vjust = 0.5), hjust = -0.1) + 
+    theme_minimal() +
+    labs(x = "Count", y = "Tissue", fill = title) +
+    ggtitle(title) +
+    scale_fill_viridis(discrete = TRUE, option = "C") + 
+    theme(axis.text.y = element_text(hjust = 1), 
+          legend.position = "bottom")  # Ajustar el texto del eje y
+  return(plot)
+}
+
 ##################################### ROSMAP ##################################### 
 
 #Read metadata --- ---
@@ -56,6 +84,7 @@ metadata_ROSMAP <- metadata_ROSMAP %>%
     TRUE ~ NA_character_ 
   )) %>% 
   mutate(is_AD = case_when(
+    cogdx == 1 & (braaksc != 0 & (ceradsc == 1 | ceradsc ==2)) ~ "resilient",
     cogdx == 1 | ceradsc == 4 ~ "noAD",
     (cogdx %in% c(4, 5) & ceradsc == 1) ~ "AD",
     cogdx %in% c(2, 3) ~ "MCI",
@@ -63,6 +92,8 @@ metadata_ROSMAP <- metadata_ROSMAP %>%
   ))
 dim(metadata_ROSMAP)
 #[1] 2809   42
+
+table(metadata_ROSMAP$is_resilient, useNA = "ifany")
 
 table(metadata_ROSMAP$dicho_NIA_reagan, useNA = "ifany")
 
@@ -135,10 +166,10 @@ names(metadata_tissue_ROSMAP) <- tissues_ROSMAP
 
 #This data was directly downloaded from https://www.synapse.org/#!Synapse:syn3388564 
 
-counts_one <- vroom::vroom(file = '/datos/rosmap/data_by_counts/ROSMAP_counts/raw_counts/ROSMAP_batch1_gene_all_counts_matrix_clean.txt')
-counts_two <- vroom::vroom(file = '/datos/rosmap/data_by_counts/ROSMAP_counts/raw_counts/ROSMAP_batch2_gene_all_counts_matrix_clean.txt') 
-counts_three <- vroom::vroom(file = '/datos/rosmap/data_by_counts/ROSMAP_counts/raw_counts/ROSMAP_batch3_gene_all_counts_matrix_clean.txt')
-counts_four <- vroom::vroom(file = '/datos/rosmap/data_by_counts/ROSMAP_counts/raw_counts/ROSMAP_batch4_gene_all_counts_matrix_clean.txt')
+counts_one <- vroom::vroom(file = '/datos/rosmap/data_by_counts/ROSMAP_counts/raw_counts/ROSMAP_batch1_gene_all_counts_matrix_clean.txt.gz')
+counts_two <- vroom::vroom(file = '/datos/rosmap/data_by_counts/ROSMAP_counts/raw_counts/ROSMAP_batch2_gene_all_counts_matrix_clean.txt.gz') 
+counts_three <- vroom::vroom(file = '/datos/rosmap/data_by_counts/ROSMAP_counts/raw_counts/ROSMAP_batch3_gene_all_counts_matrix_clean.txt.gz')
+counts_four <- vroom::vroom(file = '/datos/rosmap/data_by_counts/ROSMAP_counts/raw_counts/ROSMAP_batch4_gene_all_counts_matrix_clean.txt.gz')
 
 #Merge expression data into one
 
@@ -204,85 +235,34 @@ dim(counts_PCC_ROSMAP)
 
 #Summarize ROSMAP --- ---
 
-#NIA_Reagan
+#By NIA-Reagan
+rosmap_nia_reagan.p <- summarise_metadata(
+  data = metadata_ROSMAP,
+  group_var = "tissue",
+  fill_var = "dicho_NIA_reagan",
+  title = "NIA Reagan proportion by tissue - ROSMAP"
+)
+rosmap_nia_reagan.p
 
-sum_rosmap <- metadata_ROSMAP[,c("tissue", "dicho_NIA_reagan")]
+#by CERAD score
 
-sum_rosmap <- sum_rosmap %>%
-  mutate(dicho_NIA_reagan = ifelse(is.na(dicho_NIA_reagan), "NA", as.character(dicho_NIA_reagan)))
+rosmap_ceradsc.p <- summarise_metadata(
+  data = metadata_ROSMAP,
+  group_var = "tissue",
+  fill_var = "ceradsc",
+  title = "CERAD score proportion by tissue - ROSMAP"
+)
+rosmap_ceradsc.p
 
-sum_rosmap <- sum_rosmap %>%
-  group_by(tissue, dicho_NIA_reagan) %>%
-  summarise(count = n()) %>%
-  ungroup()
+#By diagnostic
 
-# Plot
-
-sum_rosmap.p <-ggplot(sum_rosmap, aes(x = tissue, y = count, fill = dicho_NIA_reagan)) +
-  geom_bar(stat = "identity") +
-  geom_text(aes(label = count), position = position_stack(vjust = 0.5)) + # Números de cada stack
-  # geom_text(data = N, aes(x = tissue, y = total, label = total), vjust = -0.5) + # Números totales (N)
-  theme_minimal() +
-  labs(x = "Tissue", y = "Count", fill = "NIA Reagan") +
-  ggtitle("NIA Reagan proportion by tissue - ROSMAP") +
-  scale_color_viridis()
-sum_rosmap.p
-
-#CERAD score 
-
-sum_rosmap_cerad <- metadata_ROSMAP[,c("tissue", "ceradsc")]
-
-sum_rosmap_cerad <- sum_rosmap_cerad %>%
-  group_by(tissue, ceradsc) %>%
-  summarise(count = n()) %>%
-  ungroup()
-
-ceradscore <- c(
-  "1" = "1 = AD definitivo",
-  "2" = "2 = AD probable",
-  "3" = "3 = AD posible",
-  "4" = "4 = No AD" )
-
-sum_rosmap_cerad <- sum_rosmap_cerad %>%
-  mutate(
-    cerad_description = recode(as.character(ceradsc), !!!ceradscore)
-  )
-
-# Crear el gráfico
-
-sum_rosmap_cerad <- metadata_ROSMAP[,c("tissue", "ceradsc")]
-
-sum_rosmap_cerad <- sum_rosmap_cerad %>%
-  mutate(ceradsc = ifelse(is.na(ceradsc), "NA", as.character(ceradsc)))
-
-sum_rosmap_cerad <- sum_rosmap_cerad %>%
-  group_by(tissue, ceradsc) %>%
-  summarise(count = n()) %>%
-  ungroup()
-
-ceradscore <- c(
-  "1" = "1 = AD definitivo",
-  "2" = "2 = AD probable",
-  "3" = "3 = AD posible",
-  "4" = "4 = No AD" )
-
-sum_rosmap_cerad <- sum_rosmap_cerad %>%
-  mutate(
-    cerad_description = recode(as.character(ceradsc), !!!ceradscore)
-  )
-
-# Crear el gráfico
-
-sum_rosmap_cerad.p <-ggplot(sum_rosmap_cerad, aes(x = tissue, y = count, fill = cerad_description)) +
-  geom_bar(stat = "identity") +
-  geom_text(aes(label = count), position = position_stack(vjust = 0.5)) + # Números de cada stack
-  # geom_text(data = N, aes(x = tissue, y = total, label = total), vjust = -0.5) + # Números totales (N)
-  theme_minimal() +
-  labs(x = "Tissue", y = "Count", fill = "CERAD score") +
-  ggtitle("CERAD score proportions by tissue - ROSMAP") +
-  scale_color_viridis()
-
-sum_rosmap_cerad.p
+rosmap_dx.p <- summarise_metadata(
+  data = metadata_ROSMAP,
+  group_var = "tissue",
+  fill_var = "is_AD",
+  title = "AD proportion by tissue - ROSMAP"
+)
+rosmap_dx.p
 
 ##################################### MSBB ##################################### 
 
@@ -316,8 +296,9 @@ metadata_MSBB <- metadata_MSBB %>%
     TRUE ~ NA_character_ 
   )) %>% 
   mutate(is_AD = case_when(
+    CDR %in% c(3.0, 4.0, 5.0) & (braaksc != 0 & (ceradsc == 1 | ceradsc ==2)) ~ "resilient",
     CDR == 0 | ceradsc == 4 ~ "noAD",
-    (CDR %in% c(3.0, 4.0, 5.0) & ceradsc == 1) ~ "AD",
+    (CDR %in% c(3.0, 4.0, 5.0) &  (ceradsc == 1 | ceradsc ==2)) ~ "AD",
     CDR %in% c(1.0, 2.0) ~ "MCI",
     TRUE ~ NA_character_
   ))
@@ -440,31 +421,25 @@ dim(counts_PFC_MSBB)
 
 #Summarize MSBB --- ---
 
-sum_msbb <- metadata_MSBB[,c("tissue", "ceradsc")]
+MSBB_cerad.p <- summarise_metadata(
+  data = metadata_MSBB,
+  group_var = "tissue",
+  fill_var = "ceradsc",
+  title = "CERAD proportion by tissue - ROSMAP"
+)
 
-sum_msbb <- sum_msbb %>%
-  mutate(ceradsc = ifelse(is.na(ceradsc), "NA", as.character(ceradsc)))
+MSBB_cerad.p
 
-sum_msbb <- sum_msbb %>%
-  group_by(tissue, ceradsc) %>%
-  summarise(count = n()) %>%
-  ungroup()
+#By AD
 
-sum_msbb <- sum_msbb %>%
-  mutate(
-    cerad_description = recode(as.character(ceradsc), !!!ceradscore)
-  )
+MSBB_AD.p <- summarise_metadata(
+  data = metadata_MSBB,
+  group_var = "tissue",
+  fill_var = "is_AD",
+  title = "AD proportion by tissue - ROSMAP"
+)
 
-# Crear el gráfico
-
-sum_msbb.p <- ggplot(sum_msbb, aes(x = tissue, y = count, fill = cerad_description)) +
-  geom_bar(stat = "identity") +
-  geom_text(aes(label = count), position = position_stack(vjust = 0.5)) + # Números de cada stack
-  # geom_text(data = N, aes(x = tissue, y = total, label = total), vjust = -0.5) + # Números totales (N)
-  theme_minimal() +
-  labs(x = "Tissue", y = "Count", fill = "CERAD score") +
-  ggtitle("CERAD score proportions by tissue - MSBB")
-sum_msbb.p
+MSBB_AD.p
 
 ##################################### Mayo Clinic ##################################### 
 
@@ -515,25 +490,15 @@ dim(counts_TC_Mayo)
 
 #Summarize Mayo --- ---
 
-sum_mayo <- metadata_Mayo[,c("tissue", "diagnosis")]
 
-sum_mayo <- sum_mayo %>%
-  mutate(diagnosis = ifelse(is.na(diagnosis), "NA", as.character(diagnosis)))
+dx_Mayo.p <- summarise_metadata(
+  data = metadata_Mayo,
+  group_var = "tissue",
+  fill_var = "diagnosis",
+  title = "dx proportion by tissue - Mayo"
+)
 
-sum_mayo <- sum_mayo %>%
-  group_by(tissue, diagnosis) %>%
-  summarise(count = n()) %>%
-  ungroup()
-
-sum_mayo.p <- ggplot(sum_mayo, aes(x = tissue, y = count, fill = diagnosis)) +
-  geom_bar(stat = "identity") +
-  geom_text(aes(label = count), position = position_stack(vjust = 0.5)) + # Números de cada stack
-  # geom_text(data = N, aes(x = tissue, y = total, label = total), vjust = -0.5) + # Números totales (N)
-  theme_minimal() +
-  labs(x = "Tissue", y = "Count", fill = "Diagnosis") +
-  ggtitle("Diagnosis proportions by tissue - Mayo") +
-  scale_color_viridis()
-sum_mayo.p
+dx_Mayo.p
 
 #Sumarize everything --- 
 
