@@ -144,7 +144,7 @@ fits <- lapply(names(graphLists), function(label) {
   
 })
 
-# Create a data frame with the p-values for each distribution
+#Create a data frame with the p-values for each distribution
 pvalues_df_AD <- data.frame(
   Distribution = c("Power-Law", "Poisson", "Gaussian", "Pareto", "Exponential", "Negative Binomial"),
   p_value = c(
@@ -157,4 +157,16 @@ pvalues_df_AD <- data.frame(
   )
 )
 
-fits[[1]]$Pareto
+pvalues_df_noAD <- data.frame(
+  Distribution = c("Power-Law", "Poisson", "Gaussian", "Pareto", "Exponential", "Negative Binomial"),
+  p_value = c(
+    fits[[2]]$PowerLaw$p_value$p,
+    fits[[2]]$Poisson$p_value,
+    fits[[2]]$Gaussian$p_value,
+    fits[[2]]$Pareto$p_value,
+    fits[[2]]$Exponential$p_value,
+    fits[[2]]$NegativeBinomial$p_value
+  )
+)
+
+#END
