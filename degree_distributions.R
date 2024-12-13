@@ -7,6 +7,24 @@ pacman::p_load("igraph",
                "svglite", 
                "tidygraph")
 
+#Functions --- ---
+
+#Calculate degree distribution and freq table
+calculate_degree_distribution <- function(graph, label) {
+  degree_data <- degree(graph)
+  degree_df <- data.frame(gene = names(degree_data), degree = degree_data)
+  degree_freq <- table(degree_df$degree) %>% as.data.frame()
+  colnames(degree_freq) <- c("degree", "Freq")
+  degree_freq$degree <- as.numeric(as.character(degree_freq$degree))
+  degree_freq$Prob <- degree_freq$Freq / sum(degree_freq$Freq)
+  degree_freq <- degree_freq[order(degree_freq$degree, decreasing = FALSE), ]
+  degree_freq$CumulativeDegree <- cumsum(degree_freq$Freq)
+  degree_freq$logCumulativeDegree <- log10(degree_freq$CumulativeDegree)
+  degree_freq$dx <- label
+  degree_freq$CDF <- degree_freq$CumulativeDegree / sum(degree_freq$Freq)
+  return(degree_freq)
+}
+
 #Set seed --- --- 
 
 set.seed(10)
@@ -31,35 +49,10 @@ degree_distributions <- sapply(X = graphLists, FUN = degree)
 
 #Build degree distribution dataframe
 
-ADdegree <- degree_distributions[["graphAD"]]
-ADdegree.df <- data.frame(gene = names(ADdegree), degree = ADdegree)
-ADdegree_freq <- table(ADdegree.df$degree) %>% as.data.frame()
-colnames(ADdegree_freq) <- c("degree", "Freq")
-ADdegree_freq$degree <- as.numeric(as.character(ADdegree_freq$degree))
-ADdegree_freq$Prob <- ADdegree_freq$Freq / sum(ADdegree_freq$Freq) 
-ADdegree_freq <- ADdegree_freq[order(ADdegree_freq$degree, decreasing = F), ]
-ADdegree_freq$CumulativeDegree <- cumsum(ADdegree_freq$Freq)
-# Logarithm of the cumulative sum
-ADdegree_freq$logCumulativeDegree <- log10(ADdegree_freq$CumulativeDegree)
-ADdegree_freq$dx <- "AD"
-ADdegree_freq$degree <- as.numeric(ADdegree_freq$degree)
-ADdegree_freq$CDF <- ADdegree_freq$CumulativeDegree / sum(ADdegree_freq$Freq) #Probabilidad acumulada
+ADdegree_freq <- calculate_degree_distribution(graphAD, "AD")
 
 #noAD
-
-noADdegree <- degree_distributions[["graphnoAD"]]
-noADdegree.df <- data.frame(gene = names(noADdegree), degree = noADdegree)
-noADdegree_freq <- table(noADdegree.df$degree) %>% as.data.frame()
-colnames(noADdegree_freq) <- c("degree", "Freq")
-noADdegree_freq$degree <- as.numeric(as.character(noADdegree_freq$degree))
-noADdegree_freq$Prob <- noADdegree_freq$Freq / sum(noADdegree_freq$Freq)
-noADdegree_freq <- noADdegree_freq[order(noADdegree_freq$degree, decreasing = F), ]
-noADdegree_freq$CumulativeDegree <- cumsum(noADdegree_freq$Freq)
-# Logarithm of the cumulative sum
-noADdegree_freq$logCumulativeDegree <- log10(noADdegree_freq$CumulativeDegree)
-noADdegree_freq$dx<- "control"
-noADdegree_freq$degree <- as.numeric(noADdegree_freq$degree)
-noADdegree_freq$CDF <- noADdegree_freq$CumulativeDegree / sum(noADdegree_freq$Freq)
+noADdegree_freq <- calculate_degree_distribution(graphnoAD, "control")
 
 # Find the max value of "Freq" in both networks
 max_freq_AD <- max(ADdegree_freq$Freq)
@@ -75,36 +68,6 @@ max_x <- max(max_degree_AD, max_degree_noAD)
 
 # Bind rows of both degre dis 
 dis <- rbind(ADdegree_freq, noADdegree_freq)
-
-##### Histograms #####
-
-degree_disAD <- ggplot(ADdegree.df, aes(x = degree)) +
-  geom_histogram(binwidth = 1, color = "black", fill = "#961D4E", position = "identity") +
-  labs(title = "Node degree distributions",
-       subtitle = "for AD coexpression network", 
-       x = "Degree",
-       y = "Freq") +
-  theme_minimal() +
-  scale_y_continuous(limits = c(0, max_y), expand = c(0, 0)) + 
-  scale_x_continuous(limits = c(0, max_x), breaks = seq(0, max_x, by = 10)) + 
-  scale_fill_manual() +
-  guides(fill = guide_legend(title = "Diagnosis"))
-
-degree_disnoAD <- ggplot(noADdegree.df, aes(x = degree)) +
-  geom_histogram(binwidth = 1,color = "black", fill = "#6153CC",  position = "identity") +
-  labs(title = "Node degree distributions",
-       subtitle = "for no AD coexpression network", 
-       x = "Degree",
-       y = "Freq") +
-  theme_minimal() +
-  scale_y_continuous(limits = c(0, max_y), expand = c(0, 0)) +  # Normalizar el eje y
-  scale_x_continuous(limits = c(0, max_x),breaks = seq(0, max_x, by = 10)) + 
-  scale_fill_manual() +
-  guides(fill = guide_legend(title = "Diagnosis"))
-
-#Arrange in a grid
-
-degree_dis <- grid.arrange(degree_disAD, degree_disnoAD, ncol =1 )
 
 ###### log-log graph ######
 
@@ -145,9 +108,8 @@ log_log_noAD <-  ggplot(noADdegree_freq, aes(x = degree, y = Prob)) +
 
 log_grid <- grid.arrange(log_log_AD, log_log_noAD, ncol =2)
 
-#Encontrar gammas
+#Find gammas
 
-# Asegurarse de que los datos estén en la escala correcta
 # Se toman logaritmos de los valores de k y P(k)
 ADdegree_freq$log_degree <- log(ADdegree_freq$degree)
 ADdegree_freq$log_Prob <- log(ADdegree_freq$Prob)
@@ -212,17 +174,15 @@ log_log_combined <- ggplot(dis, aes(x = degree, y = Prob, color = dx)) +
   ) +
   scale_color_manual(values = c("AD" = "blue", "Control" = "red")) +
   theme(legend.position = "none")
-
-# Mostrar el gráfico
 log_log_combined
 
-ggsave(filename = "combined_degree_dis_loglog.jpg",
-       plot = log_log_combined,
-       width = 25,
-       height = 25,
-       units = "cm",
-       dpi = 300,
-)
+# ggsave(filename = "combined_degree_dis_loglog.jpg",
+#        plot = log_log_combined,
+#        width = 25,
+#        height = 25,
+#        units = "cm",
+#        dpi = 300,
+# )
 
 #Prueba de significancia estadistica
 #Son mis distribuciones significativamente diferentes?
@@ -258,17 +218,16 @@ degree_distr_x.p <- ggplot(dis, aes(x = as.numeric(degree), y = as.numeric(Cumul
     axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1, size = 8),  # Tamaño reducido para etiquetas en el eje X
     panel.grid.major = element_blank(),  # Elimina las líneas de la cuadrícula principal
   )
-
 degree_distr_x.p
 
 #Save
-ggsave(filename = "accum_distr.jpg",
-       plot = degree_distr_x.p,
-       width = 50,
-       height = 25,
-       units = "cm",
-       dpi = 300,
-)
+# ggsave(filename = "accum_distr.jpg",
+#        plot = degree_distr_x.p,
+#        width = 50,
+#        height = 25,
+#        units = "cm",
+#        dpi = 300,
+# )
 
 #Grob
 
