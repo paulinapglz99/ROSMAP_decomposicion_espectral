@@ -47,9 +47,10 @@ summarise_metadata <- function(data, group_var, fill_var, title, fill_labels = N
     theme_minimal() +
     labs(x = "Count", y = "Tissue", fill = title) +
     ggtitle(title) +
-    scale_fill_viridis(discrete = TRUE, option = "C") + 
+    scale_fill_manual(values = c("red", "blue", "yellow", "green", "purple")) + 
+    scale_x_continuous(limits = c(0, 950)) +
     theme(axis.text.y = element_text(hjust = 1), 
-          legend.position = "bottom")  # Ajustar el texto del eje y
+          legend.position = "bottom")  
   return(plot)
 }
 
@@ -425,7 +426,7 @@ MSBB_cerad.p <- summarise_metadata(
   data = metadata_MSBB,
   group_var = "tissue",
   fill_var = "ceradsc",
-  title = "CERAD proportion by tissue - ROSMAP"
+  title = "CERAD proportion by tissue - MSBB"
 )
 
 MSBB_cerad.p
@@ -436,7 +437,7 @@ MSBB_AD.p <- summarise_metadata(
   data = metadata_MSBB,
   group_var = "tissue",
   fill_var = "is_AD",
-  title = "AD proportion by tissue - ROSMAP"
+  title = "AD proportion by tissue - MSBB"
 )
 
 MSBB_AD.p
@@ -490,7 +491,6 @@ dim(counts_TC_Mayo)
 
 #Summarize Mayo --- ---
 
-
 dx_Mayo.p <- summarise_metadata(
   data = metadata_Mayo,
   group_var = "tissue",
@@ -502,9 +502,11 @@ dx_Mayo.p
 
 #Sumarize everything --- 
 
-grid <- grid.arrange(sum_rosmap.p, sum_rosmap_cerad.p,  sum_msbb.p, sum_mayo.p, ncol = 2)
+grid <- grid.arrange(rosmap_nia_reagan.p, rosmap_ceradsc.p, rosmap_dx.p, MSBB_cerad.p, MSBB_AD.p, dx_Mayo.p, ncol = 2)
 
-ggsave(filename = "proportions_diagnosis.png", plot = grid, 
+#Save 
+
+ggsave(filename = "proportions_diagnosis_lo.png", plot = grid, 
        device = "png", width = 17, height = 10, 
        dpi = 300
 )

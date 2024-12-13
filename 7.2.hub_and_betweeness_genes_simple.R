@@ -83,6 +83,10 @@ for (name in names(graphs)) {
 shared_hub_genes <- intersect(hub_nodes[[1]], hub_nodes[[2]])
 
 #What genes are in the AD network but not in the no AD network?
+control_hubs_notAD <- setdiff(hub_nodes[[2]], hub_nodes[[1]])
+
+convert_ens_to_symbol(control_hubs_notAD)
+
 
 AD_hubs_notcontrol <- setdiff(hub_nodes[[1]], hub_nodes[[2]])
 length(AD_hubs_notcontrol)

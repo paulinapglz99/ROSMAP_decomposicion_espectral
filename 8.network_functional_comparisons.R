@@ -747,23 +747,35 @@ ggplot(all_BP_terms, aes(x = difference)) +
   ) +
   theme_minimal()
 
-
-# Gráfico de barras
-ggplot(all_BP_terms_long, aes(x = reorder(term, -count), y = count, fill = network)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  labs(
-    title = "Conteo de módulos asociados a procesos biológicos",
-    x = "Proceso biológico",
-    y = "Número de módulos",
-    fill = "Red"
-  ) +
+#
+all_diff_BP_terms.p <- ggplot(all_BP_terms, aes(x = reorder(term, difference))) +  
+  geom_point(aes(y = in_modules_AD, color = "AD"), size = 1, alpha = 0.8) +
+  geom_point(aes(y = in_modules_noAD, color = "control"), size = 1, alpha = 0.8) +
+  coord_flip() +
+  geom_segment(aes(xend = term, y = in_modules_AD, yend = 0, color = "AD"), size = 0.5, alpha = 0.8) +
+  geom_segment(aes(xend = term, y = in_modules_noAD, yend = 0, color = "control"), size = 0.5, alpha = 0.8) +
   theme_minimal() +
-  theme(axis.text.x = element_blank())
+  theme(axis.text.y = element_blank()) +
+  labs(x = "Biological Process (GO:BP)", y = "Number of Modules in which they are represented", color = "Network") +
+  ggtitle("Absolute differences in representation of Biological Processes") +
+  scale_color_manual(values = c("AD" = "red", "control" = "blue"))  # Colores personalizados
+all_diff_BP_terms.p
 
-# Seleccionar los 20 términos con la mayor diferencia
+all_diff_BP_terms.p <- ggplot(all_BP_terms, aes(x = reorder(term, difference))) +  # Reordenar según la diferencia en orden descendente
+  geom_col(aes(y = in_modules_AD, fill = "AD"), stat = "identity", position = "dodge") +
+  geom_col(aes(y = in_modules_noAD, fill = "control", alpha = 0.8), stat = "identity", position = "dodge") +
+  coord_flip() + 
+  theme_minimal() +
+  theme(axis.text.y = element_blank()) +
+  labs(x = "Biological Process (GO:BP)", y = "Number of Modules", fill = "Network") +
+  ggtitle("Top 20 Biological Processes with Largest Differences (AD vs control)")+
+  scale_fill_manual(values = c("AD" = "red", "control" = "blue"))  # Colores personalizados
+all_diff_BP_terms.p
+
+# Seleccionar los 50 términos con la mayor diferencia
 top_diff_BP_terms <- all_BP_terms %>%
   arrange(desc(difference)) %>%
-  head(30)
+  head(50)
 
 diff_BP_terms.p <- ggplot(top_diff_BP_terms, aes(x = reorder(term, difference))) +  
   geom_point(aes(y = in_modules_AD, color = "AD"), size = 4, alpha = 0.8) +
@@ -771,9 +783,11 @@ diff_BP_terms.p <- ggplot(top_diff_BP_terms, aes(x = reorder(term, difference)))
 coord_flip() +
 geom_segment(aes(xend = term, y = in_modules_AD, yend = 0, color = "AD"), size = 1, alpha = 0.8) +
   geom_segment(aes(xend = term, y = in_modules_noAD, yend = 0, color = "control"), size = 1, alpha = 0.8) +
+  geom_text(aes(y = max(in_modules_AD, in_modules_noAD) + 1, label = difference), 
+            hjust = 0, size = 3) +  # Etiquetas al final de las barras
   theme_minimal() +
   labs(x = "Biological Process (GO:BP)", y = "Number of Modules in which they are represented", color = "Network") +
-  ggtitle("Top 20 Biological Processes with Largest Differences (AD vs control)") +
+  ggtitle("Top 50 Biological Processes with Largest Differences (AD vs control)") +
   scale_color_manual(values = c("AD" = "red", "control" = "blue"))  # Colores personalizados
 diff_BP_terms.p
 
